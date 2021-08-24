@@ -1,4 +1,6 @@
 *.ipynb
 .vscode/
 .ipynb/
+
 data/
+venv/

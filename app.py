@@ -14,8 +14,11 @@ import pandas as pd
 import re
 
 """
-Paso 1: Llamado a las funciones que generan los datasets iniciales 
+Paso 1: Traerse o crear los datos
 """
+
+df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/gapminderDataFiveYear.csv')
+
 
 """
 Paso 2: Funciones de Dash
@@ -29,23 +32,34 @@ def make_empty_fig():
 """
 Paso 3: Definicion de la app
 """
-app = dash.Dash(__name__, external_stylesheets=[dbc.themes.COSMO])
-
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.COSMO]) # https://dash-bootstrap-components.opensource.faculty.ai/docs/themes/explorer/
 
 app.layout = html.Div([
     dbc.Row([ # Main header
         dbc.Col([], lg= 1),
         dbc.Col([
-            html.H1("Factores que influye en precio de la energía"),
-            html.P("Una programa desarrollado por @joseluisramon"),
-            html.Br(),
+            html.H1("Factores que influyen en precio de la energía"),
+            html.P("Una programa desarrollado por @joseluisramon para @ingebau"),
         ], lg = 10)
-    ]),
+    ], style = dict( border = '1px solid #000')),
+    html.Div([ # Set dates
+        html.P("Utilizando datos para la fecha (recuerda limitarla a 1 mes)"),
+            # Esta fecha siempre tiene que ser anterior al día actual y los datos se traerán por medio de la API
+            # para empezar a probar podemos utilizar datos de 2020 para acá
+            dcc.DatePickerRange(
+                id = 'datepicker-range',
+                min_date_allowed = date(2020,1,1),
+                max_date_allowed = date.today(),
+                initial_visible_month=date.today(),
+                # end_date = date.today()
+            ),
+            html.P( id = 'output-container-datepicker-range')
+    ], style = dict(padding = '5px 10px' ,  border='1px solid #000')),
     dbc.Row([
        dbc.Col([], lg =2),
        dbc.Col([ # Calcula
             dbc.Button(
-                "Calcular precio",
+                "Calcular precio para los N días (sacar día del range anterior)",
                  color="primary",
                  block = True)
        ], lg = 8), 
@@ -144,18 +158,7 @@ app.layout = html.Div([
                         figure=make_empty_fig()),
         ], label = 'Consumo'),
         dbc.Tab([ # Mercado y Generacion
-            html.H4("Precio del Mercado y generación"),
-            html.P("Selecciona la fecha para la cual quiere ver los datos"),
-            # Esta fecha siempre tiene que ser anterior al día actual y los datos se traerán por medio de la API
-            # para empezar a probar podemos utilizar datos de 2020 para acá
-            dcc.DatePickerRange(
-                id = 'datepicker-range',
-                min_date_allowed = date(2020,1,1),
-                max_date_allowed = date.today(),
-                initial_visible_month=date.today(),
-                # end_date = date.today()
-            ),
-            html.Div( id = 'output-container-datepicker-range'), # This is just to show of 
+            html.H4("Precio del Mercado y generación"), # This is just to show of 
             html.Br(),
             dcc.Graph(  id='generation-graph',
                         figure = make_empty_fig() )
@@ -179,11 +182,11 @@ app.layout = html.Div([
         ], label = 'Impuestos')
     ])
 
-])
+], style = dict( height= 2000 , padding='20px 5% 30px', border='1px solid #000'))
 
-"""
-Callbacks para generación
-"""
+
+# Callbacks para generación
+
 @app.callback(
     dash.dependencies.Output( 'output-container-datepicker-range', 'children'),
     [dash.dependencies.Input( 'datepicker-range', 'start_date'),
@@ -204,9 +207,9 @@ def update_output(start_date, end_date):
     else: 
         return string_prefix
 
-"""
-Callback de peajes
-"""
+
+#Callback de peajes
+
 @app.callback(
     Output('peajes_dropdown', 'options'),
     [Input('peajes_button','n_clicks')],
