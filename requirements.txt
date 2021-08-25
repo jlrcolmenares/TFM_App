@@ -7,6 +7,7 @@ Brotli==1.0.9
 cffi==1.14.6
 click==8.0.1
 colorama==0.4.4
+convertdate==2.3.2
 dash==1.21.0
 dash-bootstrap-components==0.13.0
 dash-core-components==1.17.1
@@ -20,6 +21,8 @@ et-xmlfile==1.1.0
 Flask==2.0.1
 Flask-Compress==1.10.1
 future==0.18.2
+hijri-converter==2.2.0
+holidays==0.11.2
 importlib-metadata==3.10.1
 ipykernel==6.0.3
 ipython==7.26.0
@@ -35,6 +38,7 @@ jupyter-console==6.4.0
 jupyter-core==4.7.1
 jupyterlab-pygments==0.1.2
 jupyterlab-widgets==1.0.0
+korean-lunar-calendar==0.2.1
 MarkupSafe==2.0.1
 matplotlib-inline==0.1.2
 mistune==0.8.4
@@ -55,6 +59,7 @@ prometheus-client==0.11.0
 prompt-toolkit==3.0.19
 pycparser==2.20
 Pygments==2.9.0
+PyMeeus==0.5.11
 pyparsing==2.4.7
 pyrsistent==0.18.0
 python-dateutil==2.8.2
