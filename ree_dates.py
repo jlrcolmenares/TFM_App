@@ -52,8 +52,8 @@ def ree_periods( startdate, enddate ):
     energy_20TD_P2 = dates.index.hour.isin( [8,9,14,15,16,17,22,23] ) & (fest == False) 
     energy_20TD_P3 = dates.index.hour.isin( [0,1,2,3,4,5,6,7,] ) & (fest == False) 
     
-    potence_20TD_P1 = dates.index.hour.isin( range(0,8) )
-    potence_20TD_P2 = dates.index.hour.isin( range(8,24) )
+    #potence_20TD_P1 = dates.index.hour.isin( range(0,8) )
+    #potence_20TD_P2 = dates.index.hour.isin( range(8,24) )
 
     dates['20TD_periods'] = np.select(
         [energy_20TD_P1, energy_20TD_P2, energy_20TD_P3, fest],
