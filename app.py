@@ -16,7 +16,7 @@ import re
 
 # Components
 from components import *
-from backend import starting_backend, get_tidy_df
+from backend import starting_backend, join_all_data, get_tidy_df
 
 """
 Paso 1: Traerse o crear los datos
@@ -49,7 +49,13 @@ body = html.Div(
             [  
                 dbc.Col(
                     html.Div(
-                        children=[selectores1, selectores2, selectores3,selectores4,selectores5]
+                        children=[
+                            selectores1,
+                            selectores2, 
+                            selectores3,
+                            selectores4,
+                            selectores5,
+                        ]
                     ),xs=10, sm=10, md=10, lg=9, xl=9
                 )
             ],
@@ -99,22 +105,113 @@ body = html.Div(
     ]
 )
 
-################################## CALL THE APP ##############################
+############################# CALL THE APP ####################################
 
 # Main Call for
 app.layout = html.Div(children=[body])
 
 
-########################## MAIN CALLBACKS ##############################
-# CALLBACK 0: Callback inicial. Solo se ejecuta al inicio
-@app.callback(
-    Output('output-inicial','contentEditable'),
-    Input('starting-title', 'loading_state')
+############## CALLBACK FRONTEND (FORMATO Y COMPROBACIONES) ###################
+
+@app.callback( # selector 1 afecta selector 2
+    [
+       Output("selector2-P1C", "disabled"),
+       Output("selector2-P2C", "disabled"),
+       Output("selector2-P3C", "disabled"),
+       Output("selector2-P4C", "disabled"),
+       Output("selector2-P5C", "disabled"), 
+       Output("selector2-P6C", "disabled"),
+       Output("selector2-P1C", "max"),
+       Output("selector2-P2C", "max"),
+       Output("selector2-P3C", "max"),
+       Output("selector2-P4C", "max"),
+       Output("selector2-P5C", "max"), 
+       Output("selector2-P6C", "max"),
+    ],
+    [
+        Input("selector1-tarifa-state", "value"),
+    ],
 )
-def starting_values():
+def cambio_tarifa(
+    selector_tarifa_value,
+    ):
+    print("Callback 1")
+    template = "Calculando para Tarifa: {}."
+
+    output_string = template.format(
+        selector_tarifa_value,
+    )
+    global tarifa
+    tarifa = selector_tarifa_value # Esta variable es global
+    print(output_string)
+    
+    if tarifa == "2.0TD":
+        dis_input = (False, False, True, True, True, True)
+        max_pot = (15000, 15000, 0 , 0, 0 ,0 )
+        return dis_input+max_pot
+    elif tarifa == "3.0TD":
+        dis_input = (False, False, False, False, False, False)
+        max_pot = (50000, 50000, 50000 , 50000, 50000 ,50000 )
+        return  dis_input+max_pot
+
+
+@app.callback(  # selector 2 afecta selector FINAL
+    [
+        #Output("output-selectores", "children"),
+        Output("submit-button",'disabled' )
+    ],
+    [
+        Input("selector2-P1C", "value"),
+        Input("selector2-P2C", "value"),
+        Input("selector2-P3C", "value"),
+        Input("selector2-P4C", "value"),
+        Input("selector2-P5C", "value"),
+        Input("selector2-P6C", "value")
+    ],
+)
+def cambio_potencia(
+    P1C_value,
+    P2C_value,
+    P3C_value,
+    P4C_value,
+    P5C_value,
+    P6C_value,
+    ):
+    print("Callback 2")
+    global potencias
+    potencias = [P1C_value, P2C_value, P3C_value, P4C_value,P5C_value, P6C_value]
+    
+    return None
+
+
+@app.callback( 
+    Output("output-container-datepicker-range", "children"),
+    [
+        Input("datepicker-range","start_date"),
+        Input("datepicker-range","end_date"),
+    ]
+)
+def filter_dataframe( start_date, end_date):
+    string_prefix = 'You have selected: '
+    if start_date is not None:
+        start_date_object = datetime.fromisoformat(start_date)
+        start_date_string = start_date_object.strftime('%B %d, %Y')
+        string_prefix = string_prefix + 'Start Date: ' + start_date_string + ' | '
+    if end_date is not None:
+        end_date_object = datetime.fromisoformat(end_date)
+        end_date_string = end_date_object.strftime('%B %d, %Y')
+        string_prefix = string_prefix + 'End Date: ' + end_date_string
+    if len(string_prefix) == len('You have selected: '):
+        return 'Select a date to see it displayed here'
+    else:
+        return string_prefix
+
+
+######################## CALLBACKS DE BACKEND #################################
+# CALLBACK 0: Callback inicial. Solo se ejecuta al inicio
+def starting_values(): #
     # DEFAULT VARIABLES: Callback going to edit and recall these variables
     print("Callback 0: Inicial")
-    
     tarifa_init = "2.0TD"
     potencias_contratadas = {
         "2.0TD": {  # kW
@@ -216,19 +313,15 @@ def starting_values():
     )
     print( "Fechas: ", min_date, "-", max_date)
 
-    return ( 
-        min_date,
-        max_date,
+    df_all = join_all_data(
         generation,
         prices,
-        consumption_profiles,
         pollution_taxes,
         df_terminos_hora,
-        df_subtotal,
         df_total,
-        importe_factura
     )
-
+    #breakpoint()
+    return df_all.to_json()
 
 
 # CALLBACK 1: Pasan los valores a la función principal al pulsar el botón
@@ -255,85 +348,35 @@ def pass_valores_backend( n_clicks, tarifa, p1c, p2c, p3c, p4c, p5c, p6c):
     if all(potencias):
         print("Valores validos. Calculando")
 
-    return None
-
-# CALBACK 2: Actualizar los elementos que están en la app
+    return starting_values()
 
 
-################### CALLBACKS PARA LOS SELECTORESS #####################
+######################## CALLBACKS DE FRONTEND ################################
+@app.callback(
+    Output('graph-treemap', 'figure'),
+    [Input('output-boton', 'children')])
+def make_treemap(json_data):
+    df_all = pd.read_json( json_data)
+    # Utilizar una funcion de backend para traer la data que nos interesa
 
-@app.callback( # selector 1 afecta selector 2
-    [
-       Output("selector2-P1C", "disabled"),
-       Output("selector2-P2C", "disabled"),
-       Output("selector2-P3C", "disabled"),
-       Output("selector2-P4C", "disabled"),
-       Output("selector2-P5C", "disabled"), 
-       Output("selector2-P6C", "disabled"),
-       Output("selector2-P1C", "max"),
-       Output("selector2-P2C", "max"),
-       Output("selector2-P3C", "max"),
-       Output("selector2-P4C", "max"),
-       Output("selector2-P5C", "max"), 
-       Output("selector2-P6C", "max"),
-    ],
-    [
-        Input("selector1-tarifa-state", "value"),
-    ],
-)
-def cambio_tarifa(
-    selector_tarifa_value,
-    ):
-    print("Callback 1")
-    template = "Calculando para Tarifa: {}."
-
-    output_string = template.format(
-        selector_tarifa_value,
+    df_graph, df_tidy, df_tidy2 = get_tidy_df(df_all)
+    
+    fig = px.treemap(
+         df_tidy,
+         path=[px.Constant("Componentes"), "type", "variable"],
+         values="value",
     )
-    global tarifa
-    tarifa = selector_tarifa_value # Esta variable es global
-    print(output_string)
-    
-    if tarifa == "2.0TD":
-        dis_input = (False, False, True, True, True, True)
-        max_pot = (15000, 15000, 0 , 0, 0 ,0 )
-        return dis_input+max_pot
-    elif tarifa == "3.0TD":
-        dis_input = (False, False, False, False, False, False)
-        max_pot = (50000, 50000, 50000 , 50000, 50000 ,50000 )
-        return  dis_input+max_pot
+    return fig
 
 
-@app.callback(  # selector 2 afecta selector FINAL
-    [
-        #Output("output-selectores", "children"),
-        Output("submit-button",'disabled' )
-    ],
-    [
-        Input("selector2-P1C", "value"),
-        Input("selector2-P2C", "value"),
-        Input("selector2-P3C", "value"),
-        Input("selector2-P4C", "value"),
-        Input("selector2-P5C", "value"),
-        Input("selector2-P6C", "value")
-    ],
-)
-def cambio_potencia(
-    P1C_value,
-    P2C_value,
-    P3C_value,
-    P4C_value,
-    P5C_value,
-    P6C_value,
-    ):
-    print("Callback 2")
-    global potencias
-    potencias = [P1C_value, P2C_value, P3C_value, P4C_value,P5C_value, P6C_value]
-    
-    return None
 
 
-############# ENTRY POINT #######################
+##########################################
+############# ENTRY POINT ################
+##########################################
 if __name__ == "__main__":
-
+    # starting_values()
     app.run_server(debug=True)
+    
+    
+

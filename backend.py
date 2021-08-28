@@ -148,7 +148,7 @@ def load_local_data():
 
 def build_consumptions_df(
     df_ree, tarifa, normalized_consumption, potencias_contratadas
-):
+    ):
     """
     The function take the hired potencies indicated by the user and build a consumptions curve
     taking into account the consumptions profiles the REE publish every year, and month to month
@@ -434,6 +434,7 @@ def build_terminos_df(df_consumo, df_peajes, df_prices, tarifa, margen_comer):
 
     return df_aux3
 
+
 def starting_backend(
     tarifa,
     potencias,
@@ -489,14 +490,13 @@ def starting_backend(
     T_Fijo = df_terminos_totales["T_Fijo"].sum()
     T_Variable = df_terminos_totales["T_Variable"].sum()
 
-    #
-    df_subtotal = df_terminos_hora[["Ptarif", "PC"]]
-    df_subtotal.loc[:, "TF"] = T_Fijo
+    df_subtotal = df_terminos_hora.loc[:, ["Ptarif", "PC"]] 
+    df_subtotal.loc[:, "TF"] = T_Fijo # Asi no
     df_subtotal.loc[:, "TV"] = T_Variable
-    df_subtotal.loc[:, "IEE"] = (5.1127 / 100) * (df_subtotal["TF"] + df_subtotal["TV"])
+    df_subtotal.loc[:, "IEE"] = (5.1127 / 100) * (df_subtotal["TF"].mean() + df_subtotal["TV"].mean())
     df_subtotal.loc[:, "Alquiler"] = alquileres / (365 * 24)  # 2 euros al año
     df_subtotal.loc[:, "SVA"] = adicionales / (365 * 24)
-
+        
     # Calculamos el total
     df_total = df_subtotal.aggregate(
         {
@@ -508,15 +508,15 @@ def starting_backend(
             "SVA": "sum",
         }
     )
-
+    
     iva = df_total[["TF", "TV", "IEE", "Alquiler"]].sum() * (
         impuestos["IVA"] / 100
     )  #  10%
 
     importe_factura = df_total[["TF", "TV", "IEE", "Alquiler"]].sum() + iva
     
-    df_total['IVA'] = iva
-    df_total['Suma'] = importe_factura
+    df_total.loc['IVA'] = iva
+    df_total.loc['Suma'] = importe_factura
     
     return (
         min_date,
@@ -532,35 +532,35 @@ def starting_backend(
     )
 
 
-def get_tidy_df(start_date, end_date, df_terminos_hora, df_subtotal, df_total):
+def get_tidy_df(df_all):
     """
     Datepicker-Range de Dash returns a date_string in ISO format like this one "YYYY-MM-DD".
     The idea here is to filter the final data using the input of datepicker
     and return a few of perfectly treated DF that have what I need for graphics
     """
 
-    subtotales = df_subtotal[start_date:end_date]
-    terminos_hora = df_terminos_hora[start_date:end_date]
+    #subtotales = df_subtotal[start_date:end_date]
+    #terminos_hora = df_terminos_hora[start_date:end_date]
 
     # Volteamos la tortilla
-    terminos_hora.loc[ : , "Imp Electrico"] = subtotales["IEE"] / len(terminos_hora)
-    terminos_hora.loc[ : , "Imp IVA"] = df_total['IVA'] / len(terminos_hora)
-    terminos_hora.loc[ : , "Alquiler"] = subtotales["Alquiler"]
+    df_all.loc[ : , "Imp Electrico"] = df_all["IEE"] / len(df_all)
+    df_all.loc[ : , "Imp IVA"] = df_all['IVA'] / len(df_all)
+    df_all.loc[ : , "Alquiler"] = df_all["Alquiler"]
 
-    terminos_hora.loc[:, "Peajes Potencia"] = (
-        0.001 * terminos_hora["PC"] * terminos_hora["peajes_Potencia"]
+    df_all.loc[:, "Peajes Potencia"] = (
+        0.001 * df_all["PC"] * df_all["peajes_Potencia"]
     )
-    terminos_hora.loc[:, "Margen Comercial"] = (
-        0.001 * terminos_hora["PC"] * terminos_hora["Margen"]
+    df_all.loc[:, "Margen Comercial"] = (
+        0.001 * df_all["PC"] * df_all["Margen"]
     )
-    terminos_hora.loc[:, "Peajes Energia"] = (
-        terminos_hora["Curva_Consumo"] * terminos_hora["peajes_Energia"]
+    df_all.loc[:, "Peajes Energia"] = (
+        df_all["Curva_Consumo"] * df_all["peajes_Energia"]
     )
-    terminos_hora.loc[:, "Precio Mercado"] = (
-        terminos_hora["Curva_Consumo"] * terminos_hora["Suma Componentes Precio"]
+    df_all.loc[:, "Precio Mercado"] = (
+        df_all["Curva_Consumo"] * df_all["Suma Componentes Precio"]
     )
 
-    df_graph = terminos_hora.loc[
+    df_graph = df_all.loc[
         :,
         [
             "Ptarif",
@@ -575,7 +575,7 @@ def get_tidy_df(start_date, end_date, df_terminos_hora, df_subtotal, df_total):
     ]
 
     # Limpiar lo que no está bien
-    terminos_hora = terminos_hora.drop(
+    df_all = df_all.drop(
         columns=[
             "Peajes Potencia",
             "Margen Comercial",
@@ -626,6 +626,35 @@ def get_tidy_df(start_date, end_date, df_terminos_hora, df_subtotal, df_total):
     print("Hurra!")
     return df_graph, df_tidy, df_tidy2
 
+
+def join_all_data(
+       generation,
+       prices,
+       pollution_taxes,
+       df_terminos_hora,
+       df_total,
+    ):
+    """
+    This function was develop to simplify and adapt the flux of information 
+    between the app
+    """
+    df_all = pd.concat(
+        [
+            df_terminos_hora,
+            generation,
+            prices.drop( columns = 'Suma Componentes Precio', inplace = True),
+            pollution_taxes,
+        ], axis =1, join='inner')
+
+    for index,value in pd.DataFrame(df_total[1:]).iterrows():
+        df_all.loc[: , index] = value[0]
+    
+    # termino_hora = df_all.iloc[:, 0:9]
+    # generation = df_all .iloc[:, 13:36]
+    # precio = df_all.iloc[: , 36:51]
+    # pollution = df_all.iloc[:, 51:53]
+    # totales = df_all.iloc[53:]
+    return df_all 
 
 
 if __name__ == "__main__":
@@ -736,10 +765,17 @@ if __name__ == "__main__":
     end_time = timeit.timeit()
     print("Listo: ", start_time - end_time)
 
-    #     
-    df_graph, df_tidy, df_tidy2 = get_tidy_df(
-        min_date, max_date, df_terminos_hora, df_subtotal, df_total
+    df_all = join_all_data(
+        generation,
+        prices,
+        pollution_taxes,
+        df_terminos_hora,
+        df_total,
     )
+    
+    #
+    df_graph, df_tidy, df_tidy2 = get_tidy_df(df_all)
+
 
 # %%
     #   %% GRAFICAMOS ESTA LOCURITA

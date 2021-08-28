@@ -29,7 +29,6 @@ mainHeader = html.Div(
             ],
         )
     ], 
-    id = 'starting-title', 
     style = dict( border = '1px solid #000')
 )
 
@@ -267,10 +266,9 @@ datePicker = html.Div(
         # Esta fecha siempre tiene que ser anterior al día actual y los datos se traerán por medio de la API para empezar a probar podemos utilizar datos de 2020 para acá
         dcc.DatePickerRange(
             id="datepicker-range",
-            min_date_allowed=date(2020, 1, 1),
-            max_date_allowed=date.today(),
-            initial_visible_month=date.today(),
-            # end_date = date.today()
+            min_date_allowed=date(2021,6, 1),
+            max_date_allowed=date(2021,9,1),
+            initial_visible_month=date(2021,9,1),
         ),
         html.P(id="output-container-datepicker-range"),
     ]
@@ -280,8 +278,8 @@ datePicker = html.Div(
 botonCalcular = dbc.Button(
     [
         dbc.Button(
-            "Pasar variables",
-            size="lg", 
+            "Calcular componentes",
+            #size="lg", 
             className = "mr-1",
             n_clicks = 0,
             disabled = False,
@@ -294,13 +292,15 @@ botonCalcular = dbc.Button(
 aux_output = html.Div(
     [
         html.Div(
-            id = 'output-boton'
+            id = "output-boton",
+            style = {'display': 'none'}
         ),
         html.Div(
-            id= 'output-selectores'
+            id = "output-selectores"
         ),
         html.Div(
-            id="output-inicial"
+            id = "output-inicial",
+            #style = {'display': 'none'}
         ),
     ]   
 )
@@ -319,10 +319,10 @@ treemap = html.Div(
     [
         dbc.Label("Componente del Precio"),
         html.Br(),
-        dcc.Graph(id="price-treemap", figure=make_empty_fig()),
+        dcc.Graph(id="graph-treemap", figure=make_empty_fig()),
     ]
-) 
-    
+)
+
 
 
 # indicator_tabs = dbc.Tabs(
