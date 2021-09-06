@@ -9,6 +9,7 @@ from dash.exceptions import PreventUpdate
 
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
 import pprint
 
 from datetime import date, datetime, timedelta
@@ -18,7 +19,7 @@ import re
 
 # Components
 from components import *
-from backend import *
+from backend import validation, load_local_data, build_consumptions_df, total_df
 
 """
 Paso 1: Traerse o crear los datos
@@ -215,15 +216,18 @@ def imprimir_alertas( clicks, data ):
     alerts, flag_continue = validation(inputs)
    
     if flag_continue: # Si todo está bien 
-        print("Calculado")
         print("Funcion backend")
-        data_output = json.dumps({})
+        # cargamos datos disponibles en base de datos ()
+        gen, pric, profi, taxs = load_local_data( joined = False)
+        output = total_df( inputs, gen, pric, profi, taxs)
+        data_output = output.to_json( orient= 'split')
         card_output = [ # Alerts que no me dajan seguir
             dbc.Card(
                 dbc.CardBody([
                     html.H4("Validación satisfactoria", className = "card-title"),
                     html.P("Cantidad de días a calcular")
                 ]),
+                id = 'validation-status',
                 color = 'success',
                 inverse=True    
             )
@@ -241,6 +245,7 @@ def imprimir_alertas( clicks, data ):
                         [ html.Li(alert) for alert in alerts]
                     )
                 ]),
+                id = 'validation-status',
                 color = 'warning',
                 inverse=True    
             )
@@ -252,23 +257,71 @@ def imprimir_alertas( clicks, data ):
 
 
 ######################## CALLBACKS DE GRAFICACION ################################
-# @app.callback(
-#     Output('graph-componentes', 'figure'),
-#     [Input('output-boton', 'children')])
-# def build_componentes(json_data):
-#     df_all = pd.read_json( json_data)
-#     # Utilizar una funcion de backend para traer la data que nos interesa
+@app.callback(
+    Output('consumption-graph', 'figure'),
+    [Input('validation-status', 'color')],
+    State('output-boton','data')
+)
+def graph_consumo(status, json_data): # slice the whole dataframe DF[0:20] 
+    if status == 'warning':
+        print("No se grafica")
+    elif status == 'success':
+        print('Graficando')
+        curva_consumo = pd.read_json( json_data, orient= 'split')
+        # Utilizar una funcion de backend para traer la data que nos interesa
 
-#     df_graph, df_tidy, df_tidy2 = get_tidy_df(df_all)
+        fig = make_subplots(rows=3, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0,
+            specs=[[{"rowspan": 2}],[{}], [{}]])
+
+        fig.add_trace(
+            go.Scatter(
+                x= curva_consumo.index, 
+                y= curva_consumo.Consumo*1000,
+                name = 'Consumo',
+                customdata = curva_consumo.weekday,
+                hovertemplate =
+                "<b>Consumo: %{y:.2f} kW.hora<br>" +
+                "Día: %{customdata}<br>" +
+                "Fecha: %{x}<br>" +
+                "<extra></extra>",
+            ),
+            row = 1, 
+            col = 1,
+        )
+        curva_consumo['val'] =1
+        color = ['','red','gold','green','pink','lightyellow','lightgreen']
+        for periodo in curva_consumo.Periodos.unique():
+            fig.add_trace(
+                go.Bar(
+                    x = curva_consumo.loc[curva_consumo['Periodos'] == periodo].index,
+                    y = curva_consumo.loc[curva_consumo['Periodos'] == periodo].val,
+                    showlegend = True,
+                    name = f"Periodo {periodo}",
+                    marker_color = color[periodo],
+                    offset = 0,
+                ),
+                row = 3,
+                col = 1,
+            )
+            fig.update_xaxes(showticklabels=False)
+            fig.update_yaxes(showticklabels=False)
+
+        return fig
+
+
+#def graph_consumo(json_data): # slice the whole dataframe DF[0:20] 
+    # df_all = pd.read_json( json_data)
+
+    # df_graph, df_tidy, df_tidy2 = get_tidy_df(df_all)
     
-#     fig = px.treemap(
-#          df_tidy,
-#          path=[px.Constant("Componentes"), "type", "variable"],
-#          values="value",
-#     )
-#     return fig
-
-
+    # fig = px.treemap(
+    #      df_tidy,
+    #      path=[px.Constant("Componentes"), "type", "variable"],
+    #      values="value",
+    # )
+    # return fig
 # @app.callback(
 #     Output('graph-generacion', 'figure'),
 #     [Input('output-boton', 'children')])

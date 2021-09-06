@@ -3,6 +3,7 @@ Here is where all the data treatment function are located. The idea is to fill t
 """
 # %%
 #  Python Utils
+from datetime import datetime, timedelta
 import plotly.express as px
 import pandas as pd
 import timeit
@@ -26,6 +27,7 @@ def validation(inputs):
     periodos = ['P1','P2','P3','P4','P5','P6']
     tariff = inputs['tarifa']
     potences = inputs['potencias']
+
     if tariff == '2.0TD':
         for p in periodos: 
             if potences[p] > 15.0:
@@ -58,9 +60,9 @@ def validation(inputs):
         alerts.append(f"El IVA no puede ser nulo. Insertar un número")
         cont_flag = False
     
-    print('Validacion',alerts, cont_flag)
-    
+    #print('Validacion',alerts, cont_flag) 
     return alerts ,cont_flag
+
 
 
 ############ CALLBACKS PARA TRATAMIENTO DE DATOS DISPONIBLES ##################
@@ -183,13 +185,11 @@ def load_local_data( joined = True ):
 
     #min_date = df_aux.index.min().to_pydatetime()
     #max_date = df_aux.index.max().to_pydatetime()
-    breakpoint()
     if joined == True: # Maybe in the future I don't want this data to be joined
         df_aux = pd.concat(
             [
                 generation,
                 prices,
-                consumption_profiles,
                 consumption_profiles,
                 pollution_taxes,
             ],
@@ -197,32 +197,90 @@ def load_local_data( joined = True ):
             join="inner",
         )
         return  df_aux
+    else: 
+        return generation, prices, consumption_profiles, pollution_taxes
 
 
-def filter_data(
-    tarifa,
-    potencias,
-    peajes_potencia,
-    peajes_energia,
-    margen,
-    alquileres,
-    adicionales,
-    impuestos,
+def build_consumptions_df(
+    df_ree, tarifa, normalized_consumption, potencias_contratadas
     ):
+    """
+    The function take the hired potencies indicated by the user and build a consumptions curve
+    taking into account the consumptions profiles the REE publish every year, and month to month
 
-    # Step 1: Load External Data
-    (
-        min_date,
-        max_date,
-        generation,
-        prices,
-        consumption_profiles,
-        pollution_taxes,
-    ) = load_local_data()
+    [Disclaimer]: I'm assuming that the user power consumption is directly related with the
+    hired potence. We could have another function that takes a consumption csv files with real data.
+    """
 
-    # Step 2: Generate internal periods Data
-    fechas_ree = ree_periods(min_date, max_date)
+    if tarifa == "2.0TD":
+        # For 2.0TD
+        df_aux1 = pd.concat(
+            [normalized_consumption["COEF. PERFIL P2.0TD"], df_ree.loc[:,["20TD_periods","weekday"]]],
+            axis=1,
+            join="inner",
+        )
+
+        df_aux1["PC"] = 10  # default values to create the column
+        df_aux1["Consumo"] = 0.1  # default values to create the column
+
+        df_aux1.loc[df_ree["20TD_periods"] == 1, "PC"] = potencias_contratadas["P1"]
+        df_aux1.loc[df_ree["20TD_periods"] == 2, "PC"] = potencias_contratadas["P1"]
+        df_aux1.loc[df_ree["20TD_periods"] == 3, "PC"] = potencias_contratadas["P2"]
+
+        df_aux1["Consumo"] = df_aux1["COEF. PERFIL P2.0TD"] * df_aux1["PC"]  # kWh
+  
+        df_aux1 = df_aux1.drop(columns=["COEF. PERFIL P2.0TD"])
+        df_aux1 = df_aux1.rename( columns = { "20TD_periods":"Periodos" })
+
+    elif tarifa == "3.0TD":
+        # For 3.0TD
+        df_aux1 = pd.concat(
+            [normalized_consumption["COEF. PERFIL P3.0TD"],  df_ree.loc[:,["30TD_periods","weekday"]]],
+            axis=1,
+            join="inner",
+        )
+
+        df_aux1["PC"] = 10
+        df_aux1["Consumo"] = 0.1
+
+        df_aux1.loc[df_ree["30TD_periods"] == 1, "PC"] = potencias_contratadas["P1"]
+        df_aux1.loc[df_ree["30TD_periods"] == 2, "PC"] = potencias_contratadas["P2"]
+        df_aux1.loc[df_ree["30TD_periods"] == 3, "PC"] = potencias_contratadas["P3"]
+        df_aux1.loc[df_ree["30TD_periods"] == 4, "PC"] = potencias_contratadas["P4"]
+        df_aux1.loc[df_ree["30TD_periods"] == 5, "PC"] = potencias_contratadas["P5"]
+        df_aux1.loc[df_ree["30TD_periods"] == 6, "PC"] = potencias_contratadas["P6"]
+
+        df_aux1["Consumo"] = df_aux1["COEF. PERFIL P3.0TD"] * df_aux1["PC"]# KWh
+
+        df_aux1 = df_aux1.drop(columns=["COEF. PERFIL P3.0TD"])
+        df_aux1 = df_aux1.rename( columns = { "30TD_periods":"Periodos" })
+
+    elif tarifa == "6.1TD":
+        # For 6.1TD
+        pass
+
+    return df_aux1
+
+
+def total_df( inputs, generation, prices, profiles, taxes):
+    """
+    This is the function
+    """
+    inicio = datetime.fromisoformat(inputs['start_date'] )
+    fin = datetime.fromisoformat(inputs['end_date'] ) + timedelta(hours=23)
+    fechas_ree = ree_periods( inicio , fin )
     fechas_ree = fechas_ree.drop(columns=["year", "month", "day", "hour", "string"])
+    # Paso 1
+    curva_consumo = build_consumptions_df(
+        fechas_ree, 
+        inputs['tarifa'],
+        profiles[ inputs['start_date'] : inputs['end_date'] ],
+        inputs['potencias']
+    )
+    
+    return curva_consumo
+
+
 
     # # Step 3: Build consumption curve
     # df_subtotal = df_terminos_hora.loc[:, ["Ptarif", "PC"]] 
@@ -361,39 +419,9 @@ def get_tidy_df(df_all):
     return df_graph, df_tidy, df_tidy2
 
 
-def join_all_data(
-       generation,
-       prices,
-       pollution_taxes,
-       df_terminos_hora,
-       df_total,
-    ):
-    """
-    This function was develop to simplify and adapt the flux of information 
-    between the app
-    """
-    #precio_mod = prices.rename( columns = {"Suma Componentes Precio": "Precio Total"})
-    df_all = pd.concat(
-        [
-            df_terminos_hora,
-            generation,
-            precio_mod,
-            pollution_taxes,
-        ], axis =1, join='inner')
-
-    for index,value in pd.DataFrame(df_total[1:]).iterrows():
-        df_all.loc[: , index] = value[0]
-    
-    # termino_hora = df_all.iloc[:, 0:9]
-    # generation = df_all .iloc[:, 13:36]
-    # precio = df_all.iloc[: , 36:52]
-    # pollution = df_all.iloc[:, 52:53]
-    # totales = df_all.iloc[53:]
-    return df_all 
-
  
 if __name__ == "__main__":
-
+    pass
     # start_time = timeit.timeit()
     # (
         

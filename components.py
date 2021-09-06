@@ -413,6 +413,7 @@ def make_empty_fig():
     fig = go.Figure()
     fig.layout.paper_bgcolor = "#E5ECF6"
     fig.layout.plot_bgcolor = "#E5ECF6"
+    fig.layout.height = 800
     return fig
 
 # Desglose
