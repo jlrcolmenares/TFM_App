@@ -1,5 +1,6 @@
 from logging import PlaceHolder
 import dash
+from dash_bootstrap_components._components.CardBody import CardBody
 import dash_html_components as html
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
@@ -8,6 +9,7 @@ from dash.exceptions import PreventUpdate
 
 import plotly.graph_objects as go
 import plotly.express as px
+import pprint
 
 from datetime import date, datetime, timedelta
 import pandas as pd
@@ -16,7 +18,7 @@ import re
 
 # Components
 from components import *
-from backend import starting_backend, join_all_data, get_tidy_df
+from backend import *
 
 """
 Paso 1: Traerse o crear los datos
@@ -32,343 +34,315 @@ app = dash.Dash(
 
 
 body = html.Div(
-    [
-        # Main title and information
-        dbc.Row(  
-            [
-                dbc.Col(
+    [   
+        dbc.Row( # Title and presentation. (It takes all the screen)
+        [
+            dbc.Col(
+                [
                     html.Div(
                         children=[mainHeader]
-                    ), xs=10, sm=10, md=10, lg=9, xl=9
+                    )
+                ], xs=10, sm=10, md=10, lg=10, xl=10
+            ),
+        ], justify="center"),
+        dbc.Row( # Selector and outputs. Horizontal Layout
+        [
+            dbc.Col( # Left-layout
+                [
+                html.Div(#Inputs
+                    children=[
+                        selectores1,
+                        selectores2, 
+                        selectores3,
+                        selectores4,
+                        selectores5,
+                        selectores6,
+                        botonCalcular,
+                    ]
                 )
-            ],
-            justify="center",
-        ),
-        #Inputs
-        dbc.Row(
-            [  
-                dbc.Col(
-                    html.Div(
-                        children=[
-                            selectores1,
-                            selectores2, 
-                            selectores3,
-                            selectores4,
-                            selectores5,
-                        ]
-                    ),xs=10, sm=10, md=10, lg=9, xl=9
-                )
-            ],
-            justify="center",
-        ),
-        dbc.Row(# Date Selection
-            [  
-                dbc.Col(
-                    html.Div(
-                        children=[datePicker]
-                    ), xs=10, sm=10, md=10, lg=9, xl=9
-                )
-            ],
-            justify="center", 
-        ),
-        dbc.Row(  # Trigger
-            [
-                dbc.Col(
-                    html.Div(
-                        [botonCalcular]
-                    ), xs=6, sm=6, md=6, lg=5, xl=5
-                )
-            ]
-        ),
-        #Auxiliary Output
-        dbc.Row(
-            [  
-                dbc.Col(
-                    html.Div(
+                ], md=6, lg=6, xl=6
+            ),
+            dbc.Col( # Right-layout
+                [
+                    html.Div (#Auxiliary Output
                         children=[aux_output]
-                    ), xs=10, sm=10, md=10, lg=9, xl=9
-                )
-            ],
-            justify="center", 
-        ),
-        # Output
-        dbc.Row(
-            [  
-                dbc.Col(
-                    html.Div(
-                        children=[treemap]
-                    ), xs=10, sm=10, md=10, lg=9, xl=9
-                )
-            ],
-            justify="center", 
-        ),
+                    ),# xs=10, sm=10, md=10, lg=9, xl=9
+                    html.Div( # Output
+                        children=[
+                            desglose,
+                            graph_tabs,
+                        ]  
+                    )
+                ], md=4, lg=4, xl=4
+            )
+        ], justify="center"),
     ]
 )
-
+        
+   
 ############################# CALL THE APP ####################################
 
 # Main Call for
 app.layout = html.Div(children=[body])
 
 
-############## CALLBACK FRONTEND (FORMATO Y COMPROBACIONES) ###################
+######################## CALLBACKS DE ENTRADA #################################
+# Este callback nos va a asegurar que estemos tomando los datos desde el frontend
+# y me los va a presentar en un diccionario
+@app.callback(
+    Output("output-selectores", "data"),[
+    Input("selector1-tarifa-state","value"),
+    Input("selector2-P1C", "value"),
+    Input("selector2-P2C", "value"),
+    Input("selector2-P3C", "value"),
+    Input("selector2-P4C", "value"),
+    Input("selector2-P5C", "value"),
+    Input("selector2-P6C", "value"),
+    Input("selector3-table-potencia", 'data'),
+    Input("selector3-table-energia", "data"),
+    Input("selector4-margen-potencia", "value"),
+    Input("selector4-contador", "value"),
+    Input("selector5-imp-elect", "value"),
+    Input("selector5-imp-iva", "value"),
+    Input("selector6-datepicker","start_date"),
+    Input("selector6-datepicker","end_date"),
+    ]
+)
+def build_input_dict( 
+    tarifa, p1c, p2c, p3c, p4c, p5c, p6c, 
+    rows_potencia, rows_energia, 
+    margen_pot, alquiler_cont,
+    imp_elect, iva,
+    start_date, end_date
+    ):
 
-@app.callback( # selector 1 afecta selector 2
+    # Limpiamos los valores del datatable
+    for row in rows_potencia: 
+        del row['Concepto']
+    for row in rows_energia: 
+        del row['Concepto']
+
+    # Procesamos la salida del datepicker
+    if start_date is not None:
+        start_datetime = datetime.fromisoformat(start_date)
+        start_date_string = start_datetime.strftime('%Y-%m-%d')
+    if end_date is not None:
+        end_datetime = datetime.fromisoformat(end_date)
+        end_date_string = end_datetime.strftime('%Y-%m-%d')
+    else: 
+        start_date_string, end_date_string = '2021-06-01', '2021-08-31'
+
+    # Construimos el diccionario de salida
+    input_dict ={
+        'tarifa': tarifa,
+        'potencias': {
+            'P1': p1c,
+            'P2': p2c,
+            'P3': p3c,
+            'P4': p4c,
+            'P5': p5c,
+            'P6': p6c,
+        },
+        'peajes_potencia': rows_potencia[0],
+        'cargos_potencia': rows_potencia[1],
+        'peajes_energia': rows_energia[0],
+        'cargos_energia': rows_energia[1],
+        'margen_potencia': margen_pot,
+        'alquiler_contador': alquiler_cont,
+        'imp_electrico': imp_elect,
+        'iva':iva,
+        'start_date': start_date_string,
+        'end_date': end_date_string
+    }
+
+    # return html.Div([
+    #     html.P("Datos de entrada"),
+    #     html.Pre( pprint.pformat(input_dict))
+    # ])
+    return json.dumps(input_dict)
+
+###################### CALLBACK FRONTEND (FORMATOS) ###########################
+
+# CALLBACK 1: Si se selecciona la tarifa 2.0TD no se pueden cargar potencia en P3C~P6C
+@app.callback( 
     [
-       Output("selector2-P1C", "disabled"),
-       Output("selector2-P2C", "disabled"),
-       Output("selector2-P3C", "disabled"),
-       Output("selector2-P4C", "disabled"),
-       Output("selector2-P5C", "disabled"), 
-       Output("selector2-P6C", "disabled"),
-       Output("selector2-P1C", "max"),
-       Output("selector2-P2C", "max"),
-       Output("selector2-P3C", "max"),
-       Output("selector2-P4C", "max"),
-       Output("selector2-P5C", "max"), 
-       Output("selector2-P6C", "max"),
+        Output("selector2-P1C", "disabled"),
+        Output("selector2-P2C", "disabled"),
+        Output("selector2-P3C", "disabled"),
+        Output("selector2-P4C", "disabled"),
+        Output("selector2-P5C", "disabled"), 
+        Output("selector2-P6C", "disabled"),
+        Output("selector3-table-potencia", "data"),
+        Output("selector3-table-energia", "data"),
     ],
     [
         Input("selector1-tarifa-state", "value"),
     ],
 )
-def cambio_tarifa(
-    selector_tarifa_value,
-    ):
-    print("Callback 1")
-    template = "Calculando para Tarifa: {}."
-
-    output_string = template.format(
-        selector_tarifa_value,
-    )
-    global tarifa
-    tarifa = selector_tarifa_value # Esta variable es global
-    print(output_string)
-    
+def restringir_potencias(tarifa):
     if tarifa == "2.0TD":
-        dis_input = (False, False, True, True, True, True)
-        max_pot = (15000, 15000, 0 , 0, 0 ,0 )
-        return dis_input+max_pot
+        disabled_pot = [False, False, True, True, True, True]
+        table1 = CargosPeajes_enPotencia("2.0TD").to_dict('records')
+        table2 = CargosPeajes_enEnergia("2.0TD").to_dict('records')
+        out = disabled_pot + [table1] + [table2]
+        return out
     elif tarifa == "3.0TD":
-        dis_input = (False, False, False, False, False, False)
-        max_pot = (50000, 50000, 50000 , 50000, 50000 ,50000 )
-        return  dis_input+max_pot
-
-
-@app.callback(  # selector 2 afecta selector FINAL
-    [
-        #Output("output-selectores", "children"),
-        Output("submit-button",'disabled' )
-    ],
-    [
-        Input("selector2-P1C", "value"),
-        Input("selector2-P2C", "value"),
-        Input("selector2-P3C", "value"),
-        Input("selector2-P4C", "value"),
-        Input("selector2-P5C", "value"),
-        Input("selector2-P6C", "value")
-    ],
-)
-def cambio_potencia(
-    P1C_value,
-    P2C_value,
-    P3C_value,
-    P4C_value,
-    P5C_value,
-    P6C_value,
-    ):
-    print("Callback 2")
-    global potencias
-    potencias = [P1C_value, P2C_value, P3C_value, P4C_value,P5C_value, P6C_value]
-    
-    return None
-
-
-@app.callback( 
-    Output("output-container-datepicker-range", "children"),
-    [
-        Input("datepicker-range","start_date"),
-        Input("datepicker-range","end_date"),
-    ]
-)
-def filter_dataframe( start_date, end_date):
-    string_prefix = 'You have selected: '
-    if start_date is not None:
-        start_date_object = datetime.fromisoformat(start_date)
-        start_date_string = start_date_object.strftime('%B %d, %Y')
-        string_prefix = string_prefix + 'Start Date: ' + start_date_string + ' | '
-    if end_date is not None:
-        end_date_object = datetime.fromisoformat(end_date)
-        end_date_string = end_date_object.strftime('%B %d, %Y')
-        string_prefix = string_prefix + 'End Date: ' + end_date_string
-    if len(string_prefix) == len('You have selected: '):
-        return 'Select a date to see it displayed here'
-    else:
-        return string_prefix
+        disabled_pot = [False, False, False, False, False, False]
+        table1 = CargosPeajes_enPotencia("3.0TD").to_dict('records')
+        table2 = CargosPeajes_enEnergia("3.0TD").to_dict('records')
+        out = disabled_pot + [table1] + [table2]
+        return out
 
 
 ######################## CALLBACKS DE BACKEND #################################
-# CALLBACK 0: Callback inicial. Solo se ejecuta al inicio
-def starting_values(): #
-    # DEFAULT VARIABLES: Callback going to edit and recall these variables
-    print("Callback 0: Inicial")
-    tarifa_init = "2.0TD"
-    potencias_contratadas = {
-        "2.0TD": {  # kW
-            "P1": 5100,  # P. Punta = P1P
-            "P2": 3450,  # P. Punta = P2P
-            "P3": 0,  # P. Valle = P3P
-            "P4": 0,
-            "P5": 0,
-            "P6": 0,
-        },
-        "3.0TD": {  # kW
-            "P1": 9810,
-            "P2": 9810,
-            "P3": 9810,
-            "P4": 9810,
-            "P5": 9810,
-            "P6": 15001,
-        },
-        "6.1TD": {  # kW
-            "P1": 50000,
-            "P2": 100000,
-            "P3": 100000,
-            "P4": 100000,
-            "P5": 100000,
-            "P6": 125000,
-        },
-    }
-    peajesYcargos_potencia_boe = (
-        {  # €/KW.Año. Recuerda dividir entre (365*240 horas/Año
-            "2.0TD": {"P1": 30.67, "P2": 1.42, "P3": 0, "P4": 0, "P5": 0, "P6": 0},
-            "3.0TD": {
-                "P1": 19.60,
-                "P2": 13.78,
-                "P3": 7.01,
-                "P4": 6.11,
-                "P5": 4.40,
-                "P6": 2.64,
-            },
-            "6.1TD": {
-                "P1": 30.54,
-                "P2": 25.89,
-                "P3": 14.91,
-                "P4": 12.09,
-                "P5": 3.94,
-                "P6": 2.11,
-            },
-        }
-    )
-    peajesYcargos_energia_boe = {  # €/KWh. Se suman a cada hora de consumo
-        "2.0TD": {
-            "P1": 0.133118,
-            "P2": 0.041772,
-            "P3": 0.006001,
-            "P4": 0,
-            "P5": 0,
-            "P6": 0,
-        },
-        "3.0TD": {
-            "P1": 0.077436,
-            "P2": 0.059310,
-            "P3": 0.032102,
-            "P4": 0.017413,
-            "P5": 0.007897,
-            "P6": 0.005056,
-        },
-        "6.1TD": {
-            "P1": 0.050891,
-            "P2": 0.039222,
-            "P3": 0.021931,
-            "P4": 0.012193,
-            "P5": 0.004437,
-            "P6": 0.002892,
-        },
-    }
-    margen = 4
-    alquileres = 2
-    adicionales = 0
-    impuestos = {"IVA": 10}
-    (
-        min_date,
-        max_date,
-        generation,
-        prices,
-        consumption_profiles,
-        pollution_taxes,
-        df_terminos_hora,
-        df_subtotal,
-        df_total,
-        importe_factura,
-    ) = starting_backend(
-        tarifa_init, 
-        potencias_contratadas, 
-        peajesYcargos_potencia_boe, 
-        peajesYcargos_energia_boe, 
-        margen, 
-        alquileres, 
-        adicionales, 
-        impuestos
-    )
-    print( "Fechas: ", min_date, "-", max_date)
-
-    df_all = join_all_data(
-        generation,
-        prices,
-        pollution_taxes,
-        df_terminos_hora,
-        df_total,
-    )
-    #breakpoint()
-    return df_all.to_json()
-
 
 # CALLBACK 1: Pasan los valores a la función principal al pulsar el botón
-@app.callback( 
-    Output('output-boton', 'children'),
-    Input( 'submit-button', 'n_clicks'),[
-        State( 'selector1-tarifa-state', 'value' ),
-        State( 'selector2-P1C', 'value' ),
-        State( 'selector2-P2C', 'value' ),
-        State( 'selector2-P3C', 'value' ),
-        State( 'selector2-P4C', 'value' ),
-        State( 'selector2-P5C', 'value' ),
-        State( 'selector2-P6C', 'value' ),
-    ]
-)
-def pass_valores_backend( n_clicks, tarifa, p1c, p2c, p3c, p4c, p5c, p6c):
-    print("Callback principal")
-    # ejecutar backend
-    print(tarifa)
-    print(p1c, p2c, p3c, p4c, p5c, p6c)
-    
-    # REALIZAR COMPROBACIONES ANTES DE CONTINUAR
-    potencias = [p1c, p2c, p3c, p4c, p5c, p6c]
-    if all(potencias):
-        print("Valores validos. Calculando")
-
-    return starting_values()
-
-
-######################## CALLBACKS DE FRONTEND ################################
 @app.callback(
-    Output('graph-treemap', 'figure'),
-    [Input('output-boton', 'children')])
-def make_treemap(json_data):
-    df_all = pd.read_json( json_data)
-    # Utilizar una funcion de backend para traer la data que nos interesa
-
-    df_graph, df_tidy, df_tidy2 = get_tidy_df(df_all)
+    [
+        Output('output-alerts','children'),
+        Output('output-boton','data')
+    ],
+    [
+        Input( 'submit-button', 'n_clicks'),
+    ],
+    State( 'output-selectores', 'data')
+)
+def imprimir_alertas( clicks, data ):
+    # ejecutar backend
+    print("Comprobación...")
+    inputs = json.loads(data)
+    print(inputs)
+    alerts, flag_continue = validation(inputs)
+   
+    if flag_continue: # Si todo está bien 
+        print("Calculado")
+        print("Funcion backend")
+        data_output = json.dumps({})
+        card_output = [ # Alerts que no me dajan seguir
+            dbc.Card(
+                dbc.CardBody([
+                    html.H4("Validación satisfactoria", className = "card-title"),
+                    html.P("Cantidad de días a calcular")
+                ]),
+                color = 'success',
+                inverse=True    
+            )
+        ]
+        return [card_output, data_output] #Nothing to do here   
     
-    fig = px.treemap(
-         df_tidy,
-         path=[px.Constant("Componentes"), "type", "variable"],
-         values="value",
-    )
-    return fig
+    else: # Si algo falla. Regresa componentes
+        print(inputs)
+        data_output = json.dumps({})
+        card_output = [ # Alerts que no me dajan seguir
+            dbc.Card(
+                dbc.CardBody([
+                    html.H4("Alertas de validación", className = "card-title"),
+                    html.Ul(
+                        [ html.Li(alert) for alert in alerts]
+                    )
+                ]),
+                color = 'warning',
+                inverse=True    
+            )
+        ]
+        
+        return [card_output, data_output]
+    
 
 
+
+######################## CALLBACKS DE GRAFICACION ################################
+# @app.callback(
+#     Output('graph-componentes', 'figure'),
+#     [Input('output-boton', 'children')])
+# def build_componentes(json_data):
+#     df_all = pd.read_json( json_data)
+#     # Utilizar una funcion de backend para traer la data que nos interesa
+
+#     df_graph, df_tidy, df_tidy2 = get_tidy_df(df_all)
+    
+#     fig = px.treemap(
+#          df_tidy,
+#          path=[px.Constant("Componentes"), "type", "variable"],
+#          values="value",
+#     )
+#     return fig
+
+
+# @app.callback(
+#     Output('graph-generacion', 'figure'),
+#     [Input('output-boton', 'children')])
+# def build_generacion(json_data):
+#     df_all = pd.read_json( json_data)
+#     # Utilizar una funcion de backend para traer la data que nos interesa
+
+#     df_gen = df_all.iloc[:, 13:36]
+#     demanda = df_gen.loc[:, ['Total']] # Demanda
+#     generacion = df_gen.loc[:, df_gen.columns != 'Total']
+#     # 
+#     estructura_gen = pd.melt(
+#         generacion,
+#         #id_vars="Ptarif",
+#         value_vars=generacion.columns,
+#         ignore_index=False,
+#     )
+#     # Graficar
+#     fig = px.area( 
+#         estructura_gen, 
+#         x = estructura_gen.index, 
+#         y = estructura_gen['value'], 
+#         color = estructura_gen['variable'],
+#         #animation_frame = dfgen1['datetime'].dt.hour,
+#         range_y = [-5000,45000])
+#     fig.add_trace( 
+#         go.Scatter(
+#             x = demanda.index,
+#             y = demanda['Total'],
+#             name = 'Demanda',
+#             line = dict( color = "black" )
+#         )
+#     )
+
+#     return fig
+
+
+# @app.callback(
+#     Output('graph-mercado','figure'),
+#     [Input('output-boton', 'children')])
+# def build_mercado(json_data):
+#     df_all = pd.read_json( json_data)
+#     # Utilizar una funcion de backend para traer la data que nos interesa
+    
+#     precio = df_all.iloc[: , 36:52]
+#     pollution = df_all.iloc[:, 52:53]
+    
+#     comp_precio = precio.iloc[:,:-1]
+#     total = precio.iloc[:,-1]
+
+#     estructura_gen = pd.melt(
+#         generacion,
+#         #id_vars="Ptarif",
+#         value_vars=generacion.columns,
+#         ignore_index=False,
+#     )
+#     # Graficar
+#     fig = px.area( 
+#         estructura_gen, 
+#         x = estructura_gen.index, 
+#         y = estructura_gen['value'], 
+#         color = estructura_gen['variable'],
+#         #animation_frame = dfgen1['datetime'].dt.hour,
+#         range_y = [-5000,45000])
+#     fig.add_trace( 
+#         go.Scatter(
+#             x = demanda.index,
+#             y = demanda['Total'],
+#             name = 'Demanda',
+#             line = dict( color = "black" )
+#         )
+#     )
+
+#     return fig
 
 
 ##########################################

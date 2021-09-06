@@ -1,9 +1,25 @@
+""" ree_dates
+
+Generate dates
+
+"""
+
 import calendar
 from datetime import date, datetime, timedelta
 import holidays
 import pandas as pd
 import numpy as np
 import re
+
+weekday_spain = {
+    0 : 'Lunes',
+    1 : 'Martes',
+    2 : 'Miércoles',
+    3 : 'Jueves',
+    4 : 'Viernes',
+    5 : 'Sábado',
+    6 : 'Domingo',
+}
 
 class reeHolidays(holidays.Spain):
      def _populate(self, year):
@@ -202,15 +218,17 @@ def ree_dates( startdate, enddate):
 
     output = []
     for item in hours:
-            output.append( [
+            output.append([
+                item,
                 item.year,
                 item.month,
                 item.day,
                 item.hour,
-                item,
-                item.strftime("%Y-%m-%dT%H:%M")])
+                item.strftime("%Y-%m-%dT%H:%M"),
+                weekday_spain[item.weekday()],
+            ])
 
-    df = pd.DataFrame( output,  columns=["year", "month", "day", "hour", "datetime", "string"]) # add columns
+    df = pd.DataFrame( output,  columns=["datetime", "year", "month", "day", "hour", "string", "weekday"]) # add columns
     df = df.set_index('datetime')
 
     # Set a flag for holidays and weekends (important for electric periods)
