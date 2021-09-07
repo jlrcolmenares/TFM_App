@@ -11,9 +11,6 @@ import timeit
 # Function Utils
 from ree_dates import ree_periods
 
-# Function Utils
-from ree_dates import ree_periods
-
 ########################## FUNCIONES DE VALIDACIÓN ############################
 
 def validation(inputs):
@@ -425,20 +422,17 @@ def temporal_df( inputs, generation, prices, profiles, taxes):
         profiles[ inputs['start_date'] : inputs['end_date'] ],
         inputs['potencias']
     )
-
-    # Paso 3: Tener gráfico de generación
-
-    # Paso 4: Tener gráfico de precios
     
-    
-    # curva_consumo = salida.iloc[:,0:4]
-    # prices = salida.iloc[:,19:20]
     generation = generation[ inputs['start_date'] : inputs['end_date']]
     prices = prices[ inputs['start_date'] : inputs['end_date']]
     profiles = profiles[ inputs['start_date'] : inputs['end_date']]
     taxes = taxes[ inputs['start_date'] : inputs['end_date']]
 
-    return pd.concat( [curva_consumo,prices], axis = 1)  
+
+    # curva_consumo = salida.iloc[:,0:4]
+    # prices = salida.iloc[:,19:20]
+    # generation = salida.iloc[:, 20:43]
+    return pd.concat( [curva_consumo,prices,generation], axis = 1)
 
 def total_df( inputs, curva_consumo, prices):
     """

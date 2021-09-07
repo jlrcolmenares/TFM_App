@@ -419,7 +419,7 @@ def make_empty_fig():
     fig.layout.height = 800
     return fig
 
-# Desglose
+# Desglose: Soon to be done
 desglose = html.Div([
     dbc.Card([
         dbc.CardHeader("Termino Fijo"),
@@ -432,7 +432,9 @@ desglose = html.Div([
         ])
     ],
     color="info",
-    outline=True
+    outline=True,
+    style= { 'display' : 'none'}
+
     )
 ])
 

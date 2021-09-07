@@ -1,21 +1,17 @@
-from logging import PlaceHolder
 import dash
-from dash_bootstrap_components._components.CardBody import CardBody
 import dash_html_components as html
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
 from dash.dependencies import Output, Input, State
-from dash.exceptions import PreventUpdate
 
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import pprint
 
-from datetime import date, datetime, timedelta
+from datetime import datetime
 import pandas as pd
 import json
-import re
 
 # Components
 from components import *
@@ -340,42 +336,128 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
         return fig
 
 
+@app.callback(
+    Output('generation-graph', 'figure'),
+    [Input('validation-status', 'color')],
+    State('output-tiempo-graph','data')
+)
+def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20] 
+    if status == 'warning':
+        print("No se grafica4")
+    elif status == 'success':
+        print('Graficando4')
+        # Utilizar una funcion de backend para traer la data que nos interesa
+        all_variables = pd.read_json( temporal_df, orient= 'split')
+        prices = all_variables.iloc[:,19:20]
+        generation = all_variables.iloc[:, 20:43]
+        
+        fig = make_subplots(rows=3, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.01,
+            specs=[[{}],[{"rowspan": 2}], [{}]])
+        
+        fig.add_trace(
+            go.Scatter(
+                x= prices.index,
+                y= prices['Suma Componentes Precio'],
+                name = 'Precio EUR/MW.h',
+                hoverinfo = 'y',
+                legendgroup='Fixed'
+            ),
+            row = 1,
+            col = 1,
+        )
 
-# @app.callback(
-#     Output('graph-generacion', 'figure'),
-#     [Input('output-boton', 'children')])
-# def build_generacion(json_data):
-#     df_all = pd.read_json( json_data)
-#     # Utilizar una funcion de backend para traer la data que nos interesa
+        fig.add_trace(
+            go.Scatter(
+                x= generation.index,
+                y= generation['Total'],
+                name = 'Demanda Total',
+                line = {'color':'black' },
+                hoverinfo = 'y',
+                legendgroup='Fixed'
+            ),
+            row = 2,
+            col = 1,
+        )
 
-#     df_gen = df_all.iloc[:, 13:36]
-#     demanda = df_gen.loc[:, ['Total']] # Demanda
-#     generacion = df_gen.loc[:, df_gen.columns != 'Total']
-#     # 
-#     estructura_gen = pd.melt(
-#         generacion,
-#         #id_vars="Ptarif",
-#         value_vars=generacion.columns,
-#         ignore_index=False,
-#     )
-#     # Graficar
-#     fig = px.area( 
-#         estructura_gen, 
-#         x = estructura_gen.index, 
-#         y = estructura_gen['value'], 
-#         color = estructura_gen['variable'],
-#         #animation_frame = dfgen1['datetime'].dt.hour,
-#         range_y = [-5000,45000])
-#     fig.add_trace( 
-#         go.Scatter(
-#             x = demanda.index,
-#             y = demanda['Total'],
-#             name = 'Demanda',
-#             line = dict( color = "black" )
-#         )
-#     )
+        Renovables = [
+            'Consumo bombeo',
+            'Nuclear',
+            'Biogás',
+            'Biomasa',
+            'Energía residual', 
+            'Eólica terrestre',
+            'Corrección eólica',
+            'Océano y geotérmica',
+            'Hidráulica UGH',
+            'Hidráulica no UGH',
+            'Turbinación bombeo',
+            'Solar fotovoltáica',
+            'Solar térmica'
+        ]
 
-#     return fig
+        NoRenovables = [
+            'Enlace Baleares',
+            'Residuos domésticos y similares',
+            'Residuos varios',
+            'Derivados del petróleo ó carbón',
+            'Subproductos minería',
+            'Hulla antracita',
+            'Hulla sub-bituminosa', 
+            'Cogeneración',
+            'Ciclo combinado',
+        ]
+
+        for tecnologia in Renovables: # Geration
+            fig.add_trace(
+                go.Scatter(
+                    x= generation.index,
+                    y= generation[tecnologia],
+                    name = tecnologia,
+                    mode='lines',
+                    line = {'width':0 },
+                    stackgroup= 'gen',
+                    legendgroup='Renovable',
+                    legendgrouptitle_text="Renovables",
+                    hovertemplate =
+                    "<b>: %{y:.2f} kW.hora<br>"
+                ),
+                row = 2, 
+                col = 1,
+            )
+
+        for tecnologia in NoRenovables: # Geration
+            fig.add_trace(
+                go.Scatter(
+                    x= generation.index,
+                    y= generation[tecnologia],
+                    name = tecnologia,
+                    mode='lines',
+                    line = {'width':0 },
+                    stackgroup= 'gen',
+                    legendgroup='No Renovables',
+                    legendgrouptitle_text="No Renovables",
+                    hovertemplate =
+                    "<b>: %{y:.2f} kW.hora<br>"
+                ),
+                row = 2, 
+                col = 1,
+            )
+
+        fig.update_layout(
+            title_text="Demanda y Precio",
+            legend = dict(
+                orientation="v",
+                yanchor="top",
+            ),
+            height = 1000,
+        )
+
+        fig.update_yaxes(title_text="<b>EUR/MWh</b>", row = 1, col = 1,)
+        fig.update_yaxes(title_text="<b>kW.h</b>", range=[-5000, 45000], row = 2, col = 1)
+
+        return fig
 
 
 # @app.callback(
