@@ -337,6 +337,73 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
 
 
 @app.callback(
+    Output('market-graph', 'figure'),
+    [Input('validation-status', 'color')],
+    State('output-tiempo-graph','data')
+)
+def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20] 
+    if status == 'warning':
+        print("No se grafica3")
+    elif status == 'success':
+        print('Graficando3')
+        # Utilizar una funcion de backend para traer la data que nos interesa
+        all_variables = pd.read_json( temporal_df, orient= 'split')
+        prices = all_variables.iloc[:,4:20]
+        taxes = all_variables.iloc[:, 43:44]
+
+        fig = make_subplots(rows=3, cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.02,
+            specs=[[{}],[{"rowspan": 2}], [{}]])
+
+        for item in prices.drop( 'Suma Componentes Precio', axis = 1).columns:
+            fig.add_trace(
+                go.Scatter(
+                    x= prices.index,
+                    y= prices[item],
+                    name = item,
+                    mode='lines',
+                    line = {'width':0 },
+                    stackgroup= 'gen',
+                ),
+                row = 2, 
+                col = 1,
+            )
+        
+        fig.add_trace(
+            go.Scatter(
+                x= prices.index,
+                y= prices['Suma Componentes Precio'],
+                name = 'Suma Total',
+                #line = {'color':'black'}
+            ),
+            row = 2,
+            col = 1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x= taxes.index,
+                y= taxes['EUA'],
+                name = 'Derechos C02',
+                hoverinfo = 'y',
+            ),
+            row = 1,
+            col = 1,
+        )
+
+        fig.update_layout(
+            title_text="Componente Precio y CO2",
+            hovermode="x unified"
+        )
+
+        fig.update_yaxes(title_text="<b>EUR/Ton CO2</b>", row = 1, col = 1,)
+        fig.update_yaxes(title_text="<b>EUR/MW.h</b>", row = 2, col = 1)
+
+        return fig
+
+
+@app.callback(
     Output('generation-graph', 'figure'),
     [Input('validation-status', 'color')],
     State('output-tiempo-graph','data')
@@ -409,7 +476,7 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
             'Ciclo combinado',
         ]
 
-        for tecnologia in Renovables: # Geration
+        for tecnologia in Renovables:
             fig.add_trace(
                 go.Scatter(
                     x= generation.index,
@@ -427,7 +494,7 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
                 col = 1,
             )
 
-        for tecnologia in NoRenovables: # Geration
+        for tecnologia in NoRenovables:
             fig.add_trace(
                 go.Scatter(
                     x= generation.index,
@@ -458,45 +525,6 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
         fig.update_yaxes(title_text="<b>kW.h</b>", range=[-5000, 45000], row = 2, col = 1)
 
         return fig
-
-
-# @app.callback(
-#     Output('graph-mercado','figure'),
-#     [Input('output-boton', 'children')])
-# def build_mercado(json_data):
-#     df_all = pd.read_json( json_data)
-#     # Utilizar una funcion de backend para traer la data que nos interesa
-    
-#     precio = df_all.iloc[: , 36:52]
-#     pollution = df_all.iloc[:, 52:53]
-    
-#     comp_precio = precio.iloc[:,:-1]
-#     total = precio.iloc[:,-1]
-
-#     estructura_gen = pd.melt(
-#         generacion,
-#         #id_vars="Ptarif",
-#         value_vars=generacion.columns,
-#         ignore_index=False,
-#     )
-#     # Graficar
-#     fig = px.area( 
-#         estructura_gen, 
-#         x = estructura_gen.index, 
-#         y = estructura_gen['value'], 
-#         color = estructura_gen['variable'],
-#         #animation_frame = dfgen1['datetime'].dt.hour,
-#         range_y = [-5000,45000])
-#     fig.add_trace( 
-#         go.Scatter(
-#             x = demanda.index,
-#             y = demanda['Total'],
-#             name = 'Demanda',
-#             line = dict( color = "black" )
-#         )
-#     )
-
-#     return fig
 
 
 ##########################################

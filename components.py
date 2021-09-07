@@ -458,7 +458,7 @@ graph_tabs = dbc.Tabs(
         dbc.Tab(
             [
                 html.H4("Mercado"),
-                dcc.Graph(id="marker-graph", figure=make_empty_fig()),
+                dcc.Graph(id="market-graph", figure=make_empty_fig()),
             ],
             label="Mercado",
         ),

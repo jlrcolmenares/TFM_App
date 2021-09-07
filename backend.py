@@ -1,7 +1,6 @@
 """
 Here is where all the data treatment function are located. The idea is to fill to use the data and take in 
 """
-# %%
 #  Python Utils
 from datetime import datetime, timedelta
 import plotly.express as px
@@ -430,9 +429,12 @@ def temporal_df( inputs, generation, prices, profiles, taxes):
 
 
     # curva_consumo = salida.iloc[:,0:4]
-    # prices = salida.iloc[:,19:20]
+    # prices = salida.iloc[:,4:20]
     # generation = salida.iloc[:, 20:43]
-    return pd.concat( [curva_consumo,prices,generation], axis = 1)
+    # taxes = salida.iloc[:, 43,44]
+    
+    return pd.concat( [curva_consumo,prices,generation,taxes], axis = 1)
+
 
 def total_df( inputs, curva_consumo, prices):
     """
@@ -472,29 +474,7 @@ def total_df( inputs, curva_consumo, prices):
 
     return df_final
 
-
  
 if __name__ == "__main__":
     pass
-    
 
-# %%
-    #   %% GRAFICAMOS ESTA LOCURITA
-    fig1 = px.treemap(
-        df_tidy, path=[px.Constant("Componentes"), "type", "variable"], values="value"
-    )
-    fig1.update_traces(root_color="lightgrey")
-    fig1.update_layout(margin=dict(t=30, l=25, r=25, b=25))
-    fig1.show()
-
-    # fig = px.treemap(
-    #     df_tidy,
-    #     path=[px.Constant("Periodpros"), "Ptarif", "type", "variable"],
-    #     values="value",
-    # )
-    # fig.show()
-    # Este no muestra lo que quiero. Que es el aporte de cada uno por hora
-
-    fig2 = px.bar(df_tidy2, x=df_tidy2.index, y="value", color="variable")
-    fig2.show()
-    # A esta figura le falta indicar el aporte porcentual de cada uno"""
