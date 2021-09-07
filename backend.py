@@ -64,7 +64,6 @@ def validation(inputs):
     return alerts ,cont_flag
 
 
-
 ############ CALLBACKS PARA TRATAMIENTO DE DATOS DISPONIBLES ##################
 
 def load_local_data( joined = True ):
@@ -227,7 +226,7 @@ def build_consumptions_df(
         df_aux1.loc[df_ree["20TD_periods"] == 2, "PC"] = potencias_contratadas["P1"]
         df_aux1.loc[df_ree["20TD_periods"] == 3, "PC"] = potencias_contratadas["P2"]
 
-        df_aux1["Consumo"] = df_aux1["COEF. PERFIL P2.0TD"] * df_aux1["PC"]  # kWh
+        df_aux1["Consumo"] = df_aux1["COEF. PERFIL P2.0TD"] * df_aux1["PC"]*1000 # kWh
   
         df_aux1 = df_aux1.drop(columns=["COEF. PERFIL P2.0TD"])
         df_aux1 = df_aux1.rename( columns = { "20TD_periods":"Periodos" })
@@ -250,7 +249,7 @@ def build_consumptions_df(
         df_aux1.loc[df_ree["30TD_periods"] == 5, "PC"] = potencias_contratadas["P5"]
         df_aux1.loc[df_ree["30TD_periods"] == 6, "PC"] = potencias_contratadas["P6"]
 
-        df_aux1["Consumo"] = df_aux1["COEF. PERFIL P3.0TD"] * df_aux1["PC"]# KWh
+        df_aux1["Consumo"] = df_aux1["COEF. PERFIL P3.0TD"] * df_aux1["PC"] *1000# KWh
 
         df_aux1 = df_aux1.drop(columns=["COEF. PERFIL P3.0TD"])
         df_aux1 = df_aux1.rename( columns = { "30TD_periods":"Periodos" })
@@ -262,7 +261,156 @@ def build_consumptions_df(
     return df_aux1
 
 
-def total_df( inputs, generation, prices, profiles, taxes):
+def termino_potencia(df_ree, tarifa, potences, peajes_potencia, cargos_potencia, margen):
+    
+    dias = len(df_ree.resample('1D').count())
+    K = dias/356 # constante para adaptar el 
+    
+    if tarifa == '2.0TD':
+        out_list = []
+        for p in ['P1','P2']:
+            out_list.append([
+                p,
+                potences[p],
+                peajes_potencia[p],
+                cargos_potencia[p],
+                0,
+                (dias/365),
+                (potences[p] * (peajes_potencia[p] + cargos_potencia[p]) * (K))
+            ])
+        
+        out_list.append([
+            'Ppunta',
+            potences['P1'],
+            peajes_potencia[p],
+            cargos_potencia[p],
+            margen,
+            (dias/365),
+            (potences['P1'] * (margen) * (K))      
+        ])
+        
+    elif tarifa == '3.0TD':
+        out_list = []
+        for p in ['P1','P2','P3','P4','P5','P6']:
+            out_list.append([
+                p,
+                potences[p],
+                peajes_potencia[p],
+                cargos_potencia[p],
+                0,
+                (dias/365),
+                (potences[p] * (peajes_potencia[p] + cargos_potencia[p]) * (K))
+            ])
+        
+        out_list.append([
+            'Ppunta',
+            potences['P1'],
+            0,
+            0,
+            margen,
+            (dias/365),
+            (potences['P1'] * (margen) * (K))      
+        ])
+        
+    elif tarifa == '6.1TD':
+        pass
+    
+    df = pd.DataFrame(out_list , columns = [ 'Periodos', 'PC', 'peajes_Potencia', 'cargos_Potencia', 'Margen', 'K.dias', 'T_Fijo'])
+    return df 
+
+
+def termino_energia(df_ree, tarifa, peajes_energia, cargos_energia, curva_consumo, prices):
+    """
+    This funcion take the regulatory payments indicated by State and Goverment agencies and
+    build a dataframe that have the hourly regulatory payments.
+
+    [Disclaimer]: Each  hour of the day have different payments. The results of this fact is that
+    depending on the hour the electricity consumptions in going to be more or less expensive.
+    """
+ 
+    if tarifa == "2.0TD":
+        # For 2.0TD
+        df_aux = df_ree.loc[:, ["feriado_finde", "20TD_periods"]]
+        for p in ['P1','P2','P3']:
+            df_aux.loc[df_aux["20TD_periods"] == int(p[-1]) , "peajes_Energia"] = peajes_energia[p]
+            df_aux.loc[df_aux["20TD_periods"] == int(p[-1]) , "cargos_Energia"] = cargos_energia[p]
+    
+    elif tarifa == "3.0TD":
+        # For 3.0TD
+        df_aux = df_ree.loc[:, ["feriado_finde", "30TD_periods"]]
+        for p in ['P1','P2','P3','P4','P5','P6']:
+            df_aux.loc[df_aux["30TD_periods"] == int(p[-1]) , "peajes_Energia"] = peajes_energia[p]
+            df_aux.loc[df_aux["30TD_periods"] == int(p[-1]) , "cargos_Energia"] = cargos_energia[p]
+    
+    elif tarifa == "6.1TD":
+        # For 6.1TD
+        pass
+    
+    peajesYcargos = df_aux.iloc[:, -2:]
+
+    df_aux2 = pd.concat([
+        curva_consumo.drop( columns= ['weekday']),
+        peajesYcargos,
+        prices["Suma Componentes Precio"].rename("PrecioEnergia")*0.001
+        ], axis=1, join="inner")
+    
+    df_aux2["T_Variable"] = 0.001  # default values to create the column
+    # The variable component (termino variable) is calculated easily with hourly division
+    df_aux2["T_Variable"] = (df_aux2["Consumo"]) * ( df_aux2["peajes_Energia"] + df_aux2["cargos_Energia"] + df_aux2["PrecioEnergia"] )
+    
+    df_aux3 = df_aux2.groupby('Periodos').aggregate(
+        {
+            "PC": "mean",
+            "Consumo": "sum",
+            "peajes_Energia": "mean",
+            "cargos_Energia": "mean",
+            "PrecioEnergia": "mean",
+            "T_Variable": "sum",
+        }
+    )
+    
+    # df_aux2 para treemap, df_aux3 para desglose
+    return df_aux3
+
+
+def precio_final( termino_potencia, termino_energia, imp_electrico, contador, iva):
+    """
+    The functions add the rest of the valuus of the selectors to calculate the final price
+    """
+    
+    subt_fijo = termino_potencia['T_Fijo'].sum()
+    subt_variable = termino_energia['T_Variable'].sum()
+    subt_impElec = ( subt_fijo + subt_variable )*( imp_electrico / 100)
+    subt_contador = contador * termino_potencia['K.dias'].values[0]
+    subt_iva = (subt_fijo+subt_variable+subt_impElec+subt_contador)*( iva /100)
+    total = subt_fijo+subt_variable+subt_impElec+subt_contador+subt_iva
+    
+    serie = termino_energia.sum()
+    out1 = ['Peajes', serie['peajes_Energia']]
+    out2 =['Cargos', serie['cargos_Energia']]
+    out3 = ['Consumo', serie['T_Variable'] - serie['peajes_Energia'] - serie['cargos_Energia']]
+    
+    out4, out5, out6 = 0, 0 ,0
+    for index,row in termino_potencia.iterrows():
+        out4 = out4 + row['PC']*row['peajes_Potencia']*row['K.dias']
+        out5 = out5 + row['PC']*row['cargos_Potencia']*row['K.dias'] 
+        out6 = out6 + row['PC']*row['Margen']*row['K.dias'] 
+
+    out4 = ['Peajes', out4 ]
+    out5 = ['Cargos', out5 ]
+    out6 = ['Margen', out6 ]
+
+    out7 = ['Contador', subt_contador]
+    out8 = ['Impuestos', subt_impElec]
+    out9 = ['Impuestos',subt_iva]
+    
+    out_list = [out1, out2, out3, out4, out5, out6, out7, out8, out9]
+    
+    df_out = pd.DataFrame(out_list, columns = ['Concepto', 'Euros'])
+    return df_out
+
+
+def temporal_df( inputs, generation, prices, profiles, taxes):
     """
     This is the function
     """
@@ -270,184 +418,71 @@ def total_df( inputs, generation, prices, profiles, taxes):
     fin = datetime.fromisoformat(inputs['end_date'] ) + timedelta(hours=23)
     fechas_ree = ree_periods( inicio , fin )
     fechas_ree = fechas_ree.drop(columns=["year", "month", "day", "hour", "string"])
-    # Paso 1
+    # Paso 1: Crear curva de consumo
     curva_consumo = build_consumptions_df(
         fechas_ree, 
         inputs['tarifa'],
         profiles[ inputs['start_date'] : inputs['end_date'] ],
         inputs['potencias']
     )
+
+    # Paso 3: Tener gráfico de generación
+
+    # Paso 4: Tener gráfico de precios
     
-    return curva_consumo
-
-
-
-    # # Step 3: Build consumption curve
-    # df_subtotal = df_terminos_hora.loc[:, ["Ptarif", "PC"]] 
-    # df_subtotal.loc[:, "TF"] = T_Fijo
-    # df_subtotal.loc[:, "TV"] = T_Variable
-    # df_subtotal.loc[:, "IEE"] = (5.1127 / 100) * (df_subtotal["TF"].mean() + df_subtotal["TV"].mean())
-    # df_subtotal.loc[:, "Alquiler"] = alquileres / (365 * 24)  # 2 euros al año
-    # df_subtotal.loc[:, "SVA"] = adicionales / (365 * 24)
-        
-    # # Calculamos el total
-    # df_total = df_subtotal.aggregate(
-    #     {
-    #         "Ptarif": "count",
-    #         "TF": "mean",
-    #         "TV": "mean",
-    #         "IEE": "mean",
-    #         "Alquiler": "sum",
-    #         "SVA": "sum",
-    #     }
-    # )
     
-    # iva = df_total[["TF", "TV", "IEE", "Alquiler"]].sum() * (
-    #     impuestos["IVA"] / 100
-    # )  #  10%
+    # curva_consumo = salida.iloc[:,0:4]
+    # prices = salida.iloc[:,19:20]
+    generation = generation[ inputs['start_date'] : inputs['end_date']]
+    prices = prices[ inputs['start_date'] : inputs['end_date']]
+    profiles = profiles[ inputs['start_date'] : inputs['end_date']]
+    taxes = taxes[ inputs['start_date'] : inputs['end_date']]
 
-    # importe_factura = df_total[["TF", "TV", "IEE", "Alquiler"]].sum() + iva
-    
-    # df_total.loc['IVA'] = iva
-    # df_total.loc['Suma'] = importe_factura
-    
-    # return (
-    #     min_date,
-    #     max_date,
-    #     generation,
-    #     prices,
-    #     consumption_profiles,
-    #     pollution_taxes,
-    #     df_terminos_hora,
-    #     df_subtotal,
-    #     df_total,
-    #     importe_factura,
-    #)
+    return pd.concat( [curva_consumo,prices], axis = 1)  
 
-def get_tidy_df(df_all):
+def total_df( inputs, curva_consumo, prices):
     """
-    Datepicker-Range de Dash returns a date_string in ISO format like this one "YYYY-MM-DD".
-    The idea here is to filter the final data using the input of datepicker
-    and return a few of perfectly treated DF that have what I need for graphics
+     This function calculate the final prices
+    
     """
+    inicio = datetime.fromisoformat(inputs['start_date'] )
+    fin = datetime.fromisoformat(inputs['end_date'] ) + timedelta(hours=23)
+    fechas_ree = ree_periods( inicio , fin )
+    fechas_ree = fechas_ree.drop(columns=["year", "month", "day", "hour", "string"])
 
-    #subtotales = df_subtotal[start_date:end_date]
-    #terminos_hora = df_terminos_hora[start_date:end_date]
-
-    # Volteamos la tortilla
-    df_all.loc[ : , "Imp Electrico"] = df_all["IEE"] / len(df_all)
-    df_all.loc[ : , "Imp IVA"] = df_all['IVA'] / len(df_all)
-    df_all.loc[ : , "Alquiler"] = df_all["Alquiler"]
-
-    df_all.loc[:, "Peajes Potencia"] = (
-        0.001 * df_all["PC"] * df_all["peajes_Potencia"]
+    comp_fija = termino_potencia(
+        fechas_ree,
+        inputs['tarifa'], 
+        inputs['potencias'], 
+        inputs['peajes_potencia'], 
+        inputs['cargos_potencia'],
+        inputs['margen_potencia']
     )
-    df_all.loc[:, "Margen Comercial"] = (
-        0.001 * df_all["PC"] * df_all["Margen"]
-    )
-    df_all.loc[:, "Peajes Energia"] = (
-        df_all["Curva_Consumo"] * df_all["peajes_Energia"]
-    )
-    df_all.loc[:, "Precio Mercado"] = (
-        df_all["Curva_Consumo"] * df_all["Suma Componentes Precio"]
-    )
-
-    df_graph = df_all.loc[
-        :,
-        [
-            "Ptarif",
-            "Peajes Potencia",
-            "Margen Comercial",
-            "Peajes Energia",
-            "Precio Mercado",
-            "Alquiler",
-            "Imp Electrico",
-            "Imp IVA",
-        ],
-    ]
-
-    # Limpiar lo que no está bien
-    df_all = df_all.drop(
-        columns=[
-            "Peajes Potencia",
-            "Margen Comercial",
-            "Peajes Energia",
-            "Precio Mercado",
-        ]
+    
+    comp_variable = termino_energia(
+        fechas_ree,
+        inputs['tarifa'],  
+        inputs['peajes_energia'], 
+        inputs['cargos_energia'],
+        curva_consumo,
+        prices
     )
 
-    #   %% Construimos el Dataframe bonito
-    df_tidy = pd.melt(
-        df_graph,
-        id_vars="Ptarif",
-        value_vars=[
-            "Precio Mercado",
-            "Peajes Potencia",
-            "Peajes Energia",
-            "Margen Comercial",
-            "Alquiler",
-            "Imp Electrico",
-            "Imp IVA",
-        ],
-        ignore_index=False,
-    )
-    # Asignar Tipo
-    df_tidy.loc[df_tidy["variable"] == "Precio Mercado", "type"] = "Mercado"
-    df_tidy.loc[df_tidy["variable"] == "Peajes Potencia", "type"] = "Peajes"
-    df_tidy.loc[df_tidy["variable"] == "Peajes Energia", "type"] = "Peajes"
-    df_tidy.loc[df_tidy["variable"] == "Margen Comercial", "type"] = "Comercializadora"
-    df_tidy.loc[df_tidy["variable"] == "Alquiler", "type"] = "Comercializadora"
-    df_tidy.loc[df_tidy["variable"] == "Imp Electrico", "type"] = "Impuestos"
-    df_tidy.loc[df_tidy["variable"] == "Imp IVA", "type"] = "Impuestos"
-
-    df_tidy2 = pd.melt(
-        df_graph.resample("1D").mean(),
-        id_vars="Ptarif",
-        value_vars=[
-            "Precio Mercado",
-            "Peajes Potencia",
-            "Peajes Energia",
-            "Margen Comercial",
-            "Alquiler",
-            "Imp Electrico",
-            "Imp IVA",
-        ],
-        ignore_index=False,
+    df_final = precio_final(
+        comp_fija,
+        comp_variable,
+        inputs['imp_electrico'],
+        inputs['alquiler_contador'],
+        inputs['iva'],
     )
 
-    print("Hurra!")
-    return df_graph, df_tidy, df_tidy2
+    return df_final
 
 
  
 if __name__ == "__main__":
     pass
-    # start_time = timeit.timeit()
-    # (
-        
-    #     min_date,
-    #     max_date,
-    #     generation,
-    #     prices,
-    #     consumption_profiles,
-    #     pollution_taxes,
-    #     df_terminos_hora,
-    #     df_subtotal,
-    #     df_total,
-    #     importe_factura,
-    # ) = starting_backend(
-    #     tarifa,
-    #     potencias_contratadas,  # potencias_contratadas
-    #     peajesYcargos_potencia_boe,  # peajesYcargos_potencia_boe
-    #     peajesYcargos_energia_boe,  # peajesYcargos_energia_boe
-    #     margen,
-    #     alquileres,
-    #     adicionales,
-    #     impuestos,
-    # )
-    # end_time = timeit.timeit()
-    # print("Listo: ", start_time - end_time)
-
+    
 
 # %%
     #   %% GRAFICAMOS ESTA LOCURITA

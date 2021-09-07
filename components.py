@@ -220,11 +220,11 @@ selectores2 = dbc.FormGroup(
             ),
         ], no_gutters = True),
         dbc.Tooltip(
-            "P1C: Potencia Valle para 2.0TD",
+            "P1C: Potencia Punta para 2.0TD",
             target="selector2-P1C",
         ),
         dbc.Tooltip(
-            "P2C: Potencia Punta para 2.0TD",
+            "P2C: Potencia Valle para 2.0TD",
             target="selector2-P2C",
         ),
     ], # className="mb-3"
@@ -402,7 +402,10 @@ aux_output = html.Div(
             id = "output-alerts"
         ),
         dcc.Store(
-            id = "output-boton",
+            id = "output-total-graph",
+        ),
+        dcc.Store(
+            id = "output-tiempo-graph",
         ),
     ]   
 )
@@ -437,18 +440,18 @@ desglose = html.Div([
 graph_tabs = dbc.Tabs(
     [
         dbc.Tab(
-            [
-                html.H4("Curva de Consumo"),
-                dcc.Graph(id="consumption-graph", figure=make_empty_fig()),
-            ],
-            label="Consumo",
-        ),
-        dbc.Tab(
             [ 
                 html.H4("Componentes del Precio"), 
                 dcc.Graph(id="components-graph", figure=make_empty_fig()),
             ],
             label="Componentes",
+        ),
+        dbc.Tab(
+            [
+                html.H4("Curva de Consumo"),
+                dcc.Graph(id="consumption-graph", figure=make_empty_fig()),
+            ],
+            label="Consumo",
         ),
         dbc.Tab(
             [

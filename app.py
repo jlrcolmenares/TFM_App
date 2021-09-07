@@ -19,7 +19,7 @@ import re
 
 # Components
 from components import *
-from backend import validation, load_local_data, build_consumptions_df, total_df
+from backend import validation, load_local_data, temporal_df, total_df
 
 """
 Paso 1: Traerse o crear los datos
@@ -201,14 +201,14 @@ def restringir_potencias(tarifa):
 @app.callback(
     [
         Output('output-alerts','children'),
-        Output('output-boton','data')
+        Output('output-tiempo-graph','data'),
     ],
     [
         Input( 'submit-button', 'n_clicks'),
     ],
     State( 'output-selectores', 'data')
 )
-def imprimir_alertas( clicks, data ):
+def alertas_y_calculos( clicks, data ):
     # ejecutar backend
     print("Comprobación...")
     inputs = json.loads(data)
@@ -217,10 +217,14 @@ def imprimir_alertas( clicks, data ):
    
     if flag_continue: # Si todo está bien 
         print("Funcion backend")
-        # cargamos datos disponibles en base de datos ()
+        # se cargan los datos disponibles en base de datos ()
         gen, pric, profi, taxs = load_local_data( joined = False)
-        output = total_df( inputs, gen, pric, profi, taxs)
-        data_output = output.to_json( orient= 'split')
+        # se calcular las componentes finales y se regresa un único dataframe
+        dia_dia = temporal_df( inputs, gen, pric, profi, taxs)
+        
+        #data_total = totales.to_json( orient= 'split') # Aqui no se usa
+        data_temporal = dia_dia.to_json( orient= 'split')
+        
         card_output = [ # Alerts que no me dajan seguir
             dbc.Card(
                 dbc.CardBody([
@@ -232,7 +236,7 @@ def imprimir_alertas( clicks, data ):
                 inverse=True    
             )
         ]
-        return [card_output, data_output] #Nothing to do here   
+        return [card_output, data_temporal] #Nothing to do here   
     
     else: # Si algo falla. Regresa componentes
         print(inputs)
@@ -252,24 +256,49 @@ def imprimir_alertas( clicks, data ):
         ]
         
         return [card_output, data_output]
-    
-
 
 
 ######################## CALLBACKS DE GRAFICACION ################################
 @app.callback(
+    Output('components-graph', 'figure'),
+    [
+        Input('validation-status', 'color')
+    ],
+    [
+        State('output-selectores', 'data'),
+        State('output-tiempo-graph','data')
+    ]    
+)
+def graph_components(status, inputs, temporal_df):
+    if status == 'warning':
+        print("No se grafica1")
+    elif status == 'success':
+        print('Graficando1')
+        inputs = json.loads(inputs)
+        
+        all_variables = pd.read_json( temporal_df, orient= 'split')
+        curva_consumo = all_variables.iloc[:,0:4]
+        prices = all_variables.iloc[:,19:20] # Solo suma de componentes
+        
+        df_out = total_df( inputs, curva_consumo, prices)
+        fig = px.bar(df_out, x='Concepto', y='Euros', color ='Concepto', title="Componentes del Precio")
+        return fig
+
+
+@app.callback(
     Output('consumption-graph', 'figure'),
     [Input('validation-status', 'color')],
-    State('output-boton','data')
+    State('output-tiempo-graph','data')
 )
-def graph_consumo(status, json_data): # slice the whole dataframe DF[0:20] 
+def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20] 
     if status == 'warning':
-        print("No se grafica")
+        print("No se grafica2")
     elif status == 'success':
-        print('Graficando')
-        curva_consumo = pd.read_json( json_data, orient= 'split')
+        print('Graficando2')
         # Utilizar una funcion de backend para traer la data que nos interesa
-
+        all_variables = pd.read_json( temporal_df, orient= 'split')
+        curva_consumo = all_variables.iloc[:,0:4]
+        
         fig = make_subplots(rows=3, cols=1,
             shared_xaxes=True,
             vertical_spacing=0,
@@ -282,7 +311,7 @@ def graph_consumo(status, json_data): # slice the whole dataframe DF[0:20]
                 name = 'Consumo',
                 customdata = curva_consumo.weekday,
                 hovertemplate =
-                "<b>Consumo: %{y:.2f} kW.hora<br>" +
+                "<b>Consumo: %{y:.2f} W.hora<br>" +
                 "Día: %{customdata}<br>" +
                 "Fecha: %{x}<br>" +
                 "<extra></extra>",
@@ -311,17 +340,7 @@ def graph_consumo(status, json_data): # slice the whole dataframe DF[0:20]
         return fig
 
 
-#def graph_consumo(json_data): # slice the whole dataframe DF[0:20] 
-    # df_all = pd.read_json( json_data)
 
-    # df_graph, df_tidy, df_tidy2 = get_tidy_df(df_all)
-    
-    # fig = px.treemap(
-    #      df_tidy,
-    #      path=[px.Constant("Componentes"), "type", "variable"],
-    #      values="value",
-    # )
-    # return fig
 # @app.callback(
 #     Output('graph-generacion', 'figure'),
 #     [Input('output-boton', 'children')])
