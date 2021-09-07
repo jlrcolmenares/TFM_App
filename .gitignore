@@ -1,11 +1,12 @@
+.DS_Store
 *.ipynb
 .vscode/
 .ipynb/
 
-data/
 venv/
-
-treemap/
+*.pyc
+.env
+.ipynb_checkpoints/
 __pycache__/
 
 ESIOS-master/
