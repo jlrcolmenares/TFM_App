@@ -29,7 +29,7 @@ app = dash.Dash(
     external_stylesheets=[dbc.themes.COSMO],
     prevent_initial_callbacks= True,
 ) 
-
+server = app.server
 
 body = html.Div(
     [   
@@ -560,8 +560,7 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
 ############# ENTRY POINT ################
 ##########################################
 if __name__ == "__main__":
-    # starting_values()
     app.run_server(debug=True)
-    
+    #server = app.server
     
 
