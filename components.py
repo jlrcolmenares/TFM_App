@@ -1,9 +1,9 @@
-from logging import disable
-import dash
 import dash_html_components as html
 import dash_core_components as dcc
 import dash_bootstrap_components as dbc
+import dash_daq as daq
 import dash_table
+
 import plotly.graph_objects as go
 import plotly.express as px
 
@@ -90,17 +90,23 @@ mainHeader = html.Div(
         dbc.Col(
             [
             html.H1("Factores que influyen en precio de la electricidad"),
-            html.P("Un proyecto desarrollado para el TFM del MSIET \n Desarrollado por @joseluisramon"),
+            html.Pre("Proyecto del Trabajo Final deL MSIET - Desarrollado por José Luis Colmenares - Universidad de Sevilla. 2021"),
+            html.P("La aplicación está compuesta por seis secciones. Cada sección da acceso a variables que afectan el precio del recibo eléctrico y permite modificar las variables manualmente. Al pulsar el botón <Calcular recibo> se obtiene el precio a pagar por la factura eléctrica según las modificaciones y pueden visualizar distintas curvas"),
             ],
         )
-    ], 
+    ],
+    className = 'header--main',
     style = dict( margin = '50px 0px 20px', border = '2px solid black')
 )
 
 
-selectores1 = dbc.FormGroup(
-    [
+selectores1 = dbc.Row([
+    dbc.Col([
         html.H2("Tarifa:"),
+        html.P([
+            "Seleccione la tarifa para la cual desea estimar el precio del recibo eléctrico. Las tarifas 2.0TD y 3.0TD tendrán los mismo márgenes de comercialización."],
+            className = 'explanation'
+        ),
         dbc.RadioItems(
             options=[
                 {"label": "2.0TD", "value": "2.0TD"},
@@ -110,15 +116,42 @@ selectores1 = dbc.FormGroup(
             value='2.0TD',
             id="selector1-tarifa-state",
         ),
-    ]
-) 
+    ], ),
+    dbc.Col([
+        html.H2("Curvas:"),
+        html.P([
+            "Puede trabajar con la curvas perfiladas de consumo y con el histórico de precio del mercado eléctrico o puede cargar sus propias curvas y ver cómo afectan al precio final."],
+            className = 'explanation'
+        ),
+        dbc.Checklist(
+            options = [
+                {"label": 'Usar Perfiles REE', "value": 1, "disabled": True},
+            ],
+            value = [1],
+            id = 'selector1-usar-perfiles', 
+            switch = True,
+        ),
+        dbc.Checklist(
+            options = [
+                {"label": 'Usar Precios REE', "value": 1, "disabled": True},
+            ],
+            value = [1],
+            id = 'selector1-usar-mercado', 
+            switch = True,
+        )
+    ],),
+])
 
 selectores2 = dbc.FormGroup(
     [   
         html.H2("Potencias Contratadas:"),
-        dbc.Label("Expresadas en kilovatios año [kW]"),
+        html.P([
+            "Selecciones las que tiene contratadas (expresadas en kW/año) para cada uno de los periodos tarifarios."
+            ], className = 'explanation'
+        ),
         dbc.Row([
             dbc.Col(
+                [
                 dbc.InputGroup(
                     [
                         dbc.InputGroupAddon("P1C", addon_type="prepend"),
@@ -132,9 +165,7 @@ selectores2 = dbc.FormGroup(
                             id='selector2-P1C'
                         ),
                     ],
-                )
-            ),
-            dbc.Col(
+                ),
                 dbc.InputGroup(
                     [
                         dbc.InputGroupAddon("P2C", addon_type="prepend"),
@@ -149,8 +180,6 @@ selectores2 = dbc.FormGroup(
                         ),
                     ],
                 ),
-            ),
-            dbc.Col(
                 dbc.InputGroup(
                     [
                         dbc.InputGroupAddon("P3C", addon_type="prepend"),
@@ -166,8 +195,10 @@ selectores2 = dbc.FormGroup(
                         ),
                     ],
                 ),
+                ]       
             ),
             dbc.Col(
+                [
                 dbc.InputGroup(
                     [
                         dbc.InputGroupAddon("P4C", addon_type="prepend"),
@@ -183,8 +214,6 @@ selectores2 = dbc.FormGroup(
                         ),
                     ],
                 ),
-            ),
-            dbc.Col(
                 dbc.InputGroup(
                     [
                         dbc.InputGroupAddon("P5C", addon_type="prepend"),
@@ -200,8 +229,6 @@ selectores2 = dbc.FormGroup(
                         ),
                     ],
                 ),
-            ),
-            dbc.Col(
                 dbc.InputGroup(
                     [
                         dbc.InputGroupAddon("P6C", addon_type="prepend"),
@@ -217,8 +244,10 @@ selectores2 = dbc.FormGroup(
                         ),
                     ],
                 ),
+                ]
             ),
-        ], no_gutters = True),
+        ], #no_gutters = True
+        ),
         dbc.Tooltip(
             "P1C: Potencia Punta para 2.0TD",
             target="selector2-P1C",
@@ -227,23 +256,25 @@ selectores2 = dbc.FormGroup(
             "P2C: Potencia Valle para 2.0TD",
             target="selector2-P2C",
         ),
-    ], # className="mb-3"
+    ], style = dict( margin = '20px 0px 0px')
 )
 
 
 selectores3 = html.Div(
     [
         html.H2("Peajes y Cargos"),
-        html.P("Los peajes de distribución y transporte aparecen descritos en BOE-XXXX. Los cargos aparecen descritos en el BOE-XXXX. La unidades en las que están expresados difieren: "
+        html.P([
+            "Los peajes de distribución y transporte aparecen descritos en BOE-A-2021-4565. Los cargos aparecen descritos en el BOE-A-2021-6390. La unidades en las que están expresados difieren:"],
+            className = 'explanation'
         ),
         html.Ul([
             html.Li("En Potencia: Están expresados en [EUR/kW/año]"),
             html.Li("En Energía: Están expresados en [EUR/kWh]")
-        ]),
+        ], className = 'explanation'),
         dbc.CardHeader("Peajes y Cargos Aplicables al Término de Potencia"),
         dash_table.DataTable(
             id='selector3-table-potencia',
-            columns= [{"name": i, "id": i} for i in CargosPeajes_enPotencia('6.1TD').columns],
+            columns= [{"name": i, "id": i, "type": "numeric"} for i in CargosPeajes_enPotencia('6.1TD').columns],
             data=CargosPeajes_enPotencia('6.1TD').to_dict('records'),
             editable = True,
             style_header={
@@ -260,7 +291,7 @@ selectores3 = html.Div(
         dbc.CardHeader("Peajes y Cargos Aplicables al Término de Energia"),
         dash_table.DataTable(
             id='selector3-table-energia',
-            columns= [{"name": i, "id": i} for i in CargosPeajes_enEnergia('6.1TD').columns],
+            columns= [{"name": i, "id": i, "type": "numeric"} for i in CargosPeajes_enEnergia('6.1TD').columns],
             data=CargosPeajes_enEnergia('6.1TD').to_dict('records'),
             editable = True,
             style_header={
@@ -274,14 +305,14 @@ selectores3 = html.Div(
                 'overflow': 'hidden'
             }
         ),
-    ]
+    ], style = dict( margin = '20px 0px 0px')
 )
 
 
 selectores4 = html.Div(
     [
         html.H2("Relativos a la Comercialización"),
-        html.P("El margen que se lleva las comercializadoras está regulados por el BOE-XXX. El concepto por alquiler va a la distribuidora. Igual dejamos abierto la posibilida de modificarlos para ver como afectan la factura final"),
+        html.P("El margen que se llevan las comercializadoras está regulados. El concepto a pagar por alquiler va a la distribuidora."),
         dbc.CardGroup([
             dbc.Card([
                 dbc.CardBody([
@@ -290,9 +321,10 @@ selectores4 = html.Div(
                         id = "selector4-margen-potencia",
                         placeholder = 'EUR/kW/año',
                         type = "number",
+                        value = 3.117,
                         min = 0, 
                         max = 50, 
-                        step = 0.01,
+                        step = 0.001,
                     )
                 ])
             ]),
@@ -303,6 +335,7 @@ selectores4 = html.Div(
                         id = "selector4-contador",
                         placeholder = 'EUR/año',
                         type = "number",
+                        value = 1.3,
                         min = 0, 
                         max = 50, 
                         step = 0.0001,
@@ -310,7 +343,7 @@ selectores4 = html.Div(
                 ])
             ]),
         ])
-    ]
+    ], style = dict( margin = '20px 0px 0px')
 )
 
 
@@ -347,17 +380,17 @@ selectores5 = html.Div(
                             step = 1,
                         )  
                     ]),
-                dbc.CardFooter( "Aplicable a la sumatoria de todos los cargos")
+                dbc.CardFooter( "Aplicable a la suma de todos los cargos")
             ]),       
         ]),
-    ]
+    ],style = dict( margin = '20px 0px 0px')
 )
 
 
 selectores6 = html.Div(
     [
         html.H2("Rangos de Fechas"),
-        html.P("Las restricciones actuales de la aplicación solo permiten seleccionar fecha entre el 01 de junnio de 2021 y el 31 de agosto de 2021."),
+        html.P("Las restricciones actuales de la aplicación solo permiten seleccionar fecha entre el 01 de junio de 2021 y el 31 de agosto de 2021."),
         # Esta fecha siempre tiene que ser anterior al día actual y los datos se traerán por medio de la API para empezar a probar podemos utilizar datos de 2020 para acá
         dbc.Row([
             dcc.DatePickerRange(
@@ -372,20 +405,20 @@ selectores6 = html.Div(
                 with_portal=True
             ),
         ], justify = 'center'),
-    ],
+    ], style = dict( margin = '20px 0px 0px')
 )
        
 
 botonCalcular = html.Div(
     [ 
         dbc.Button(
-        "Calcular precio",
+        "Calcular Recibo Eléctrico",
         id = 'submit-button',
-        color="primary", 
+        color = "primary", 
         block = True,
         n_clicks = 0,
         disabled = False,
-        style = dict(fontSize= '24pt', margin='50px 0px 100px'),
+        style = dict(fontSize= '24pt', margin='20px 0px 100px'),
         ),
     ]
 )
@@ -402,13 +435,100 @@ aux_output = html.Div(
             id = "output-alerts"
         ),
         dcc.Store(
-            id = "output-total-graph",
-        ),
-        dcc.Store(
             id = "output-tiempo-graph",
         ),
+        html.Div(
+            id = "output-desglose",
+            style = dict( width = '100%')
+        ),
+        
     ]   
 )
+
+def build_deglose( inputs, dict_out ):
+    """
+    Construir el desglose es un proceso más o menos fastidioso
+    """
+    valor1 = dict_out["Subt_Fijo"]
+    d1_1 = [dbc.DropdownMenuItem(
+        f"Término Fijo: {valor1:.3F} €",
+        style = dict( fontSize = '1rem') 
+    )]
+    d1_2 = [
+        dbc.DropdownMenuItem(
+            f"{item[0]} = {item[1]:.3f} kW x ( ({item[2]:.3f} + {item[3]:.3f}) + {item[4]} ) €/kW/año x {item[5]:.3f} días/año) = {item[6]:.3f} €", 
+            disabled=True,
+            style = dict( fontSize = 12),
+            ) for item in dict_out["Termino_Fijo"]] 
+    d1_3 = [dbc.DropdownMenuItem(divider=True)]
+    
+    valor2 = dict_out["Subt_Variable"]
+    d2_1 = [dbc.DropdownMenuItem(
+        f"Término Fijo: {valor2:.3F} €",
+        style = dict( fontSize = '1rem') 
+    )]
+    d2_2 = [
+        dbc.DropdownMenuItem(
+            f"{item[0]} = {item[1]:.3f} kWh x ( {item[2]:.3f} + {item[3]:.3f} + {item[4]:.3f} ) €/kWh = {item[5]:.3f} €", 
+            disabled=True,
+            style = dict( fontSize = 12),
+            ) for item in dict_out["Termino_Variable"]] 
+    d2_3 = [dbc.DropdownMenuItem(divider=True)]
+
+
+    valor31 = dict_out["IEE"]
+    valor32 = inputs["imp_electrico"]
+    d3_1 = [dbc.DropdownMenuItem(
+        f"Impuesto Eléctrico: {valor31:.3F} €",
+        style = dict( fontSize = '1rem') 
+    )]
+    d3_2 = [
+        dbc.DropdownMenuItem(
+            f"( {valor1:.3f} € + {valor2:.3f} € ) x {valor32:.3f}% = {valor31:.3f} €", 
+            disabled=True,
+            style = dict( fontSize = 12)
+    )]
+    d3_3 = [dbc.DropdownMenuItem(divider=True)]
+
+    valor41 = dict_out["Contador"]
+    valor42 = dict_out["Termino_Fijo"][0][5]
+    valor43 = inputs["alquiler_contador"]
+    d4_1 = [dbc.DropdownMenuItem(
+        f"Alquiler del Contador: {valor41:.3F} €",
+        style = dict( fontSize = '1rem') 
+    )]
+    d4_2 = [
+        dbc.DropdownMenuItem(
+            f"( {valor43:.3f} €/año x {valor42:.3f} días/año ) = {valor41:.3f} €", 
+            disabled=True,
+            style = dict( fontSize = 12)
+    )]
+    d4_3 = [dbc.DropdownMenuItem(divider=True)]
+
+    valor51 = dict_out["IVA"]
+    valor52 = inputs["iva"]
+    d5_1 = [dbc.DropdownMenuItem(
+        f"Alquiler del Contador: {valor51:.3F} €",
+        style = dict( fontSize = '1rem') 
+    )]
+    d5_2 = [
+        dbc.DropdownMenuItem(
+            f"( {valor1:.3f} € + {valor2:.3f} € + {valor31:.3f} € + {valor41:.3f} € ) x {valor52:.3f}% = {valor51:.3f} €", 
+            disabled=True,
+            style = dict( fontSize = 12)
+    )]
+    d5_3 = [dbc.DropdownMenuItem(divider=True)]
+
+    desglose_final = dbc.DropdownMenu(
+        d1_1+d1_2+d1_3+d2_1+d2_2+d2_3+d3_1+d3_2+d3_3+d4_1+d4_2+d4_3+d5_1+d5_2+d5_3
+        ,
+        label = f"Total = {dict_out['Total']:.3f} €",
+        color = "info",
+        bs_size="lg",
+    )
+
+    return desglose_final
+
 
 ########################## OUTPUT COMPONENTS #############################
 
@@ -419,24 +539,6 @@ def make_empty_fig():
     fig.layout.height = 800
     return fig
 
-# Desglose: Soon to be done
-desglose = html.Div([
-    dbc.Card([
-        dbc.CardHeader("Termino Fijo"),
-        dbc.CardBody([
-        
-        ]),
-        dbc.CardHeader("Termino Variable"),
-        dbc.CardBody([
-        
-        ])
-    ],
-    color="info",
-    outline=True,
-    style= { 'display' : 'none'}
-
-    )
-])
 
 # Gráficos
 graph_tabs = dbc.Tabs(
@@ -447,6 +549,7 @@ graph_tabs = dbc.Tabs(
                 dcc.Graph(id="components-graph", figure=make_empty_fig()),
             ],
             label="Componentes",
+            style = dict( margin = '20px 0px 0px')
         ),
         dbc.Tab(
             [
@@ -454,6 +557,7 @@ graph_tabs = dbc.Tabs(
                 dcc.Graph(id="consumption-graph", figure=make_empty_fig()),
             ],
             label="Consumo",
+            style = dict( margin = '20px 0px 0px')
         ),
         dbc.Tab(
             [
@@ -461,6 +565,7 @@ graph_tabs = dbc.Tabs(
                 dcc.Graph(id="market-graph", figure=make_empty_fig()),
             ],
             label="Mercado",
+            style = dict( margin = '20px 0px 0px')
         ),
         dbc.Tab(
             [
@@ -468,6 +573,7 @@ graph_tabs = dbc.Tabs(
                 dcc.Graph(id="generation-graph", figure=make_empty_fig()),
             ],
             label="Generación",
+            style = dict( margin = '20px 0px 0px')
         ),
-    ],
+    ], style = dict( margin = '20px 0px 0px')
 )

@@ -1,0 +1,23 @@
+.header--main {
+    margin: '50px 0px 20px' !important;
+    border: '2px solid black' !important;
+} 
+
+.explanation {
+    font-size: 11px;
+    text-align: justify;
+} 
+
+.upload-consumo {
+    width: 100% ;
+    border-radius: 5px;
+    border-color: black;
+    border-width: '1px';
+    border-style: 'dashed';
+    background-color: lightgray;
+    text-align: center;
+}
+
+#output-desglose > div > button {
+    width: 100%;
+}

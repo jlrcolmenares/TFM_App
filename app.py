@@ -25,9 +25,10 @@ Paso 1: Traerse o crear los datos
 Paso 3: Definicion de la app
 """
 app = dash.Dash(
-    __name__, external_stylesheets=[dbc.themes.COSMO],
-    prevent_initial_callbacks= True, # Lo cargas inicalmente cuando ejecutas el programa
-)  # https://dash-bootstrap-components.opensource.faculty.ai/docs/themes/explorer/
+    __name__,
+    external_stylesheets=[dbc.themes.COSMO],
+    prevent_initial_callbacks= True,
+) 
 
 
 body = html.Div(
@@ -37,7 +38,9 @@ body = html.Div(
             dbc.Col(
                 [
                     html.Div(
-                        children=[mainHeader]
+                        children=[
+                            mainHeader
+                        ]
                     )
                 ], xs=10, sm=10, md=10, lg=10, xl=10
             ),
@@ -57,20 +60,19 @@ body = html.Div(
                         botonCalcular,
                     ]
                 )
-                ], md=6, lg=6, xl=6
+                ], xs=10, sm=10, md=4, lg=4, xl=4
             ),
             dbc.Col( # Right-layout
                 [
                     html.Div (#Auxiliary Output
                         children=[aux_output]
-                    ),# xs=10, sm=10, md=10, lg=9, xl=9
+                    ),
                     html.Div( # Output
                         children=[
-                            desglose,
                             graph_tabs,
                         ]  
                     )
-                ], md=4, lg=4, xl=4
+                ], xs=10, sm=10, md=6, lg=6, xl=6
             )
         ], justify="center"),
     ]
@@ -190,6 +192,10 @@ def restringir_potencias(tarifa):
         out = disabled_pot + [table1] + [table2]
         return out
 
+# CALLBACK 2: Permitir cargar curvas
+#@app.callback(
+#
+#)
 
 ######################## CALLBACKS DE BACKEND #################################
 
@@ -212,20 +218,19 @@ def alertas_y_calculos( clicks, data ):
     alerts, flag_continue = validation(inputs)
    
     if flag_continue: # Si todo está bien 
-        print("Funcion backend")
+        #print("Funcion backend")
         # se cargan los datos disponibles en base de datos ()
-        gen, pric, profi, taxs = load_local_data( joined = False)
+        gen, prices, profiles, co2_taxes, gas_index = load_local_data( joined = False)
         # se calcular las componentes finales y se regresa un único dataframe
-        dia_dia = temporal_df( inputs, gen, pric, profi, taxs)
+        dia_dia = temporal_df( inputs, gen, prices, profiles, co2_taxes, gas_index)
         
-        #data_total = totales.to_json( orient= 'split') # Aqui no se usa
+    
         data_temporal = dia_dia.to_json( orient= 'split')
         
         card_output = [ # Alerts que no me dajan seguir
             dbc.Card(
                 dbc.CardBody([
                     html.H4("Validación satisfactoria", className = "card-title"),
-                    html.P("Cantidad de días a calcular")
                 ]),
                 id = 'validation-status',
                 color = 'success',
@@ -255,8 +260,11 @@ def alertas_y_calculos( clicks, data ):
 
 
 ######################## CALLBACKS DE GRAFICACION ################################
-@app.callback(
+
+@app.callback([
+    Output('output-desglose', 'children'),
     Output('components-graph', 'figure'),
+    ],
     [
         Input('validation-status', 'color')
     ],
@@ -274,11 +282,20 @@ def graph_components(status, inputs, temporal_df):
         
         all_variables = pd.read_json( temporal_df, orient= 'split')
         curva_consumo = all_variables.iloc[:,0:4]
-        prices = all_variables.iloc[:,19:20] # Solo suma de componentes
+        prices = all_variables.iloc[:,4:12] # Solo suma de componentes
         
-        df_out = total_df( inputs, curva_consumo, prices)
-        fig = px.bar(df_out, x='Concepto', y='Euros', color ='Concepto', title="Componentes del Precio")
-        return fig
+        df_out, dict_out = total_df( inputs, curva_consumo, prices)
+        
+        # Construir desglose
+        desglose = build_deglose( inputs, dict_out )
+
+        # Print Figure and Modify it
+        fig = px.bar(df_out.reset_index(), x='Concepto', y='Euros', color ='Concepto', text = 'Porcent')
+        fig.update_traces(
+            textposition = 'outside',
+            texttemplate = "%{text:.2%}"
+        )
+        return desglose, fig
 
 
 @app.callback(
@@ -348,8 +365,9 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
         print('Graficando3')
         # Utilizar una funcion de backend para traer la data que nos interesa
         all_variables = pd.read_json( temporal_df, orient= 'split')
-        prices = all_variables.iloc[:,4:20]
-        taxes = all_variables.iloc[:, 43:44]
+        prices = all_variables.iloc[:,4:12]
+        taxes = all_variables.iloc[:, 35:36]
+        gas = all_variables.iloc[:, 36:37]
 
         fig = make_subplots(rows=3, cols=1,
             shared_xaxes=True,
@@ -375,9 +393,20 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
                 x= prices.index,
                 y= prices['Suma Componentes Precio'],
                 name = 'Suma Total',
-                #line = {'color':'black'}
+                line = {'color':'goldenrod'}
             ),
             row = 2,
+            col = 1,
+        )
+
+        fig.add_trace(
+            go.Scatter(
+                x= gas.index,
+                y= gas['MIBGAS Index'],
+                name = 'MIBGAS',
+                hoverinfo = 'y',
+            ),
+            row = 1,
             col = 1,
         )
 
@@ -415,8 +444,8 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
         print('Graficando4')
         # Utilizar una funcion de backend para traer la data que nos interesa
         all_variables = pd.read_json( temporal_df, orient= 'split')
-        prices = all_variables.iloc[:,19:20]
-        generation = all_variables.iloc[:, 20:43]
+        prices = all_variables.iloc[:,4:12]
+        generation = all_variables.iloc[:, 12:35]
         
         fig = make_subplots(rows=3, cols=1,
             shared_xaxes=True,
@@ -488,7 +517,7 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
                     legendgroup='Renovable',
                     legendgrouptitle_text="Renovables",
                     hovertemplate =
-                    "<b>: %{y:.2f} kW.hora<br>"
+                    "<b>%{y:.2f} MW.hora<br>"
                 ),
                 row = 2, 
                 col = 1,
@@ -506,7 +535,7 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
                     legendgroup='No Renovables',
                     legendgrouptitle_text="No Renovables",
                     hovertemplate =
-                    "<b>: %{y:.2f} kW.hora<br>"
+                    "<b>%{y:.2f} MW.hora<br>"
                 ),
                 row = 2, 
                 col = 1,

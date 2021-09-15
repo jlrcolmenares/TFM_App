@@ -10,67 +10,13 @@ import timeit
 # Function Utils
 from ree_dates import ree_periods
 
-########################## FUNCIONES DE VALIDACIÓN ############################
-
-def validation(inputs):
+def build_data_sources( ):
     """
-    This functions takes the input dict and builds a set of alarms for
+    This functions takes json files from scraping stage and transforme then in pickle files that are more actionable and usable inside the main app
     """
-    # Salidas
-    alerts = []
-    cont_flag = True
-    # PASO 1: Comprobacion de potencias
-    periodos = ['P1','P2','P3','P4','P5','P6']
-    tariff = inputs['tarifa']
-    potences = inputs['potencias']
-
-    if tariff == '2.0TD':
-        for p in periodos: 
-            if potences[p] > 15.0:
-                alerts.append(f"{p}C: Superior a máxima para 2.0TD (15kW)")
-                cont_flag = False
-
-    elif tariff == '3.0TD':
-        pot_list = [] # greater than max number
-        for p in periodos: 
-            pot_list.append(potences[p])
-        
-        if ( all( pot_list[i] <= pot_list[i+1] for i in range(len(pot_list)-1))):
-            cont_flag = True
-        else: 
-            alerts.append(f"Potencias no cumplen con P1<=P2...<=P6")
-            cont_flag = False
-    # PASO 2: Comprobaciones DataTable
-    
-    # PASO 3: Comprobar que las inputs no sean cero
-    if inputs['margen_potencia'] == None: 
-        alerts.append(f"El margen comercial no puede ser nulo. Insertar un número")
-        cont_flag = False
-    if inputs['alquiler_contador'] == None: 
-        alerts.append(f"El pago por alquiler de equipos no puede ser nulo. Insertar un número")
-        cont_flag = False
-    if inputs['imp_electrico'] == None: 
-        alerts.append(f"El impuesto eléctrico no puede ser nulo. Insertar un número")
-        cont_flag = False
-    if inputs['iva'] == None: 
-        alerts.append(f"El IVA no puede ser nulo. Insertar un número")
-        cont_flag = False
-    
-    #print('Validacion',alerts, cont_flag) 
-    return alerts ,cont_flag
-
-
-############ CALLBACKS PARA TRATAMIENTO DE DATOS DISPONIBLES ##################
-
-def load_local_data( joined = True ):
-    """
-    The function load data from the given source. At the start, we
-    are going to work with json files. In the following version I want to
-    return the data from ESIOS api (or personal API):
-    """
-    # %%  1) Process "Power Generation" Data
+    # 1) Process "Power Generation" Data
     generation = pd.read_json(
-        "./data/power_generation/export_GeneraciónProgramada +ConsumoBombeo +CableBalearesP48_2021-08-23_19_15.json",
+        "./data/power_generation/export_GeneraciónProgramada +ConsumoBombeo +CableBalearesP48_2021-09-14_17_49.json",
         encoding="utf-8",
         dtype={"datetime": "str"},
     )
@@ -114,33 +60,35 @@ def load_local_data( joined = True ):
     generation = generation.pivot_table(
         values="value", columns="name", index="datetime", fill_value=0
     )
-
-    # %% 2) Process "Energy Prices" data
+    generation.to_pickle("./data/power_generation/generation.pkl")
+    
+    #2) Process "Energy Prices" data
     prices = pd.read_json(
-        "./data/pvpc_prices/export_PrecioMedioHorarioFinalSumaDeComponentes_2021-08-23_19_18.json",
+        "./data/energy_prices/export_PrecioMedioHorarioFinalSumaDeComponentes_2021-09-14_18_14.json",
         encoding="utf-8",
         dtype={"datetime": "str"},
     )
     prices["datetime"] = prices["datetime"].str.replace("+01:00", "", regex=False)
     prices["datetime"] = prices["datetime"].str.replace("+02:00", "", regex=False)
+    
     prices.replace(
         {
             "Precio medio horario componente banda secundaria ": "Banda Secundaria",
-            "Precio medio horario componente control factor potencia ": " Control Factor Potencia",
-            "Precio medio horario componente desvíos medidos ": " Desvíos Medidos",
-            "Precio medio horario componente fallo nominación UPG ": " Fallo Nominación UPG",
-            "Precio medio horario componente incumplimiento energía de balance ": " Incumplimiento Energía de Balance",
-            "Precio medio horario componente mercado diario ": " Mercado Diario",
-            "Precio medio horario componente mercado intradiario ": " Mercado Intradiario",
-            "Precio medio horario componente pago de capacidad ": " Pago de Capacidad",
+            "Precio medio horario componente control factor potencia ": "Control Factor Potencia",
+            "Precio medio horario componente desvíos medidos ": "Desvíos Medidos",
+            "Precio medio horario componente fallo nominación UPG ": "Fallo Nominación UPG",
+            "Precio medio horario componente incumplimiento energía de balance ": "Incumplimiento Energía de Balance",
+            "Precio medio horario componente mercado diario ": "Mercado Diario",
+            "Precio medio horario componente mercado intradiario ": "Mercado Intradiario",
+            "Precio medio horario componente pago de capacidad ": "Pago por Capacidad",
             "Precio medio horario componente reserva de potencia adicional a subir ": "Reserva de Potencia adicional a subir",
-            "Precio medio horario componente restricciones PBF ": " Restricciones PBF",
-            "Precio medio horario componente restricciones intradiario ": " Restricciones Intradiario",
-            "Precio medio horario componente restricciones tiempo real ": " Restricciones tiempo real",
-            "Precio medio horario componente saldo P.O.14.6 ": " Saldo P.O.14.6'",
-            "Precio medio horario componente saldo de desvíos ": " Saldo de Desvíos",
-            "Precio medio horario componente servicio de interrumpibilidad ": " Servicio de Interrumpibilidad",
-            "Precio medio horario final suma de componentes": "Suma Componentes Precio",
+            "Precio medio horario componente restricciones PBF ": "Restricciones PBF",
+            "Precio medio horario componente restricciones intradiario ": "Restricciones Intradiario",      
+            "Precio medio horario componente restricciones tiempo real ": "Restricciones tiempo real",
+            "Precio medio horario componente saldo P.O.14.6 ": "Saldo P.O.14.6", # Intercambios internacionales no Realizados
+            "Precio medio horario componente saldo de desvíos ": "Saldo de Desvíos",
+            "Precio medio horario componente servicio de interrumpibilidad ": "Interrumpibilidad",
+            "Precio medio horario final suma de componentes": "Suma Componentes Precio", # TOTAL
         },
         inplace=True,
     )
@@ -150,7 +98,18 @@ def load_local_data( joined = True ):
         values="value", columns="name", index="datetime", fill_value=0
     )
 
-    # %% 3) Process "Profile consuptions" data
+    prices["Desvíos"] = prices["Desvíos Medidos"] + prices["Saldo de Desvíos"]
+    prices["Restricciones"] = prices["Restricciones Intradiario"] + prices["Restricciones tiempo real"] + prices["Restricciones PBF"] + prices["Saldo P.O.14.6"]
+    prices["Otros Ajustes"] =  prices["Banda Secundaria"] + prices["Control Factor Potencia"] + prices["Fallo Nominación UPG"] + prices["Incumplimiento Energía de Balance"] + prices["Reserva de Potencia adicional a subir"]
+
+    prices = prices.drop(columns = {
+        "Desvíos Medidos", "Saldo de Desvíos", "Restricciones Intradiario", "Restricciones tiempo real",
+        "Restricciones PBF", "Saldo P.O.14.6", "Banda Secundaria", "Control Factor Potencia", "Fallo Nominación UPG",
+        "Incumplimiento Energía de Balance", "Reserva de Potencia adicional a subir"
+    })
+    prices.to_pickle("./data/energy_prices/prices.pkl",)
+
+    #3) Process "Profile consuptions" data
     consumption_profiles = pd.read_csv(
         "./data/consumption_curves/perfiles_homemade.csv", sep=";", decimal=","
     )
@@ -166,8 +125,9 @@ def load_local_data( joined = True ):
         ["FECHA", "VERANO(1)/INVIERNO(0)", "COEF. PERFIL P2.0TD", "COEF. PERFIL P3.0TD"]
     ]
     consumption_profiles = consumption_profiles.set_index("FECHA")
+    consumption_profiles.to_pickle("./data/consumption/consump_profiles.pkl",)
 
-    # %% 4) Process "CO2 right" data
+    #4) Process "CO2 right" data
     pollution_taxes = pd.read_csv(
         "./data/other_markets/historico-precios-CO2-_2021_.csv", sep=";"
     )
@@ -176,7 +136,98 @@ def load_local_data( joined = True ):
     )  # .dt.tz_localize("UTC").dt.tz_convert("Europe/Madrid")
     pollution_taxes = pollution_taxes.set_index("Fecha")
     pollution_taxes = pollution_taxes[["EUA"]]
-    pollution_taxes = pollution_taxes.resample("1H").ffill()  # to have hourly data
+    pollution_taxes = pollution_taxes.resample("1H").ffill()  # hourly data format
+    pollution_taxes.to_pickle("./data/other_markets/co2_rights.pkl",)
+
+    #5) Spanish Gas Indexes prices
+    gas_prices = pd.read_csv(
+            "./data/other_markets/mibgas.csv", sep=";", decimal = ','
+        )
+    gas_prices["Fecha"] = pd.to_datetime(
+        gas_prices["Delivery day"], dayfirst=True
+    )
+
+    gas_prices = gas_prices.set_index("Fecha")
+    gas_prices = gas_prices[["MIBGAS Index\n[EUR/MWh]"]]
+    gas_prices.columns = ["MIBGAS Index"]
+    gas_prices = gas_prices.resample("1H").ffill()
+    gas_prices.to_pickle("./data/other_markets/gas_index.pkl",)
+
+########################## FUNCIONES DE VALIDACIÓN ############################
+
+def validation(inputs):
+    """
+    This functions takes the input dict and builds a set of alarms for
+    """
+    # Salidas
+    alerts = []
+    cont_flag = True
+    # PASO 1: Comprobacion de potencias
+    periodos = ['P1','P2','P3','P4','P5','P6']
+    tariff = inputs['tarifa']
+    potences = inputs['potencias']
+
+    try: 
+        if tariff == '2.0TD':
+            for p in periodos[:2]:
+                if potences[p] == 0:
+                    alerts.append(f"{p}C: No puede ser cero")
+                    cont_flag = False
+
+                if potences[p] > 15.0:
+                    alerts.append(f"{p}C: Superior a máxima para 2.0TD (15kW)")
+                    cont_flag = False
+
+        elif tariff == '3.0TD':
+            pot_list = [] # greater than max number
+            
+            if ( all( pot_list[i] <= pot_list[i+1] for i in range(len(pot_list)-1))):
+                cont_flag = True
+            else: 
+                alerts.append(f"Potencias no cumplen con P1<=P2...<=P6")
+                cont_flag = False
+
+            for p in periodos: 
+                pot_list.append(potences[p])
+                if potences[p] == 0:
+                    alerts.append(f"{p}C: No puede ser cero")
+                    cont_flag = False
+        # PASO 2: Comprobaciones DataTable
+        
+        # PASO 3: Comprobar que las inputs no sean cero
+        if inputs['margen_potencia'] == None: 
+            alerts.append(f"El margen comercial no puede ser nulo. Insertar un número")
+            cont_flag = False
+        if inputs['alquiler_contador'] == None: 
+            alerts.append(f"El pago por alquiler de equipos no puede ser nulo. Insertar un número")
+            cont_flag = False
+        if inputs['imp_electrico'] == None: 
+            alerts.append(f"El impuesto eléctrico no puede ser nulo. Insertar un número")
+            cont_flag = False
+        if inputs['iva'] == None: 
+            alerts.append(f"El IVA no puede ser nulo. Insertar un número")
+            cont_flag = False
+        
+        #print('Validacion',alerts, cont_flag) 
+        return alerts ,cont_flag
+    except TypeError:
+        alerts.append(f"Alguno de los datos de entrada se encuentra vacío. Completar")
+        cont_flag = False
+
+
+############ CALLBACKS PARA TRATAMIENTO DE DATOS DISPONIBLES ##################
+
+def load_local_data( joined = True ):
+    """
+    The function load data from the given source. At the start, we
+    are going to work with json files. In the following version I want to
+    return the data from ESIOS api (or personal API):
+    """
+    generation = pd.read_pickle("./data/power_generation/generation.pkl")
+    prices = pd.read_pickle("./data/energy_prices/prices.pkl")
+    consumption_profiles = pd.read_pickle("./data/consumption/consump_profiles.pkl")
+    pollution_taxes = pd.read_pickle("./data/other_markets/co2_rights.pkl")
+    gas_prices = pd.read_pickle("./data/other_markets/gas_index.pkl")
 
     #min_date = df_aux.index.min().to_pydatetime()
     #max_date = df_aux.index.max().to_pydatetime()
@@ -187,13 +238,14 @@ def load_local_data( joined = True ):
                 prices,
                 consumption_profiles,
                 pollution_taxes,
+                gas_prices
             ],
             axis=1,
             join="inner",
         )
         return  df_aux
     else: 
-        return generation, prices, consumption_profiles, pollution_taxes
+        return generation, prices, consumption_profiles, pollution_taxes, gas_prices
 
 
 def build_consumptions_df(
@@ -317,11 +369,9 @@ def termino_potencia(df_ree, tarifa, potences, peajes_potencia, cargos_potencia,
 
 def termino_energia(df_ree, tarifa, peajes_energia, cargos_energia, curva_consumo, prices):
     """
-    This funcion take the regulatory payments indicated by State and Goverment agencies and
-    build a dataframe that have the hourly regulatory payments.
+    This funcion take the regulatory payments indicated by State and Goverment agencies and build a dataframe that have the hourly regulatory payments.
 
-    [Disclaimer]: Each  hour of the day have different payments. The results of this fact is that
-    depending on the hour the electricity consumptions in going to be more or less expensive.
+    [Disclaimer]: Each  hour of the day have different payments. The results of this fact is that depending on the hour the electricity consumptions in going to be more or less expensive.
     """
  
     if tarifa == "2.0TD":
@@ -402,13 +452,19 @@ def precio_final( termino_potencia, termino_energia, imp_electrico, contador, iv
     
     out_list = [out1, out2, out3, out4, out5, out6, out7, out8, out9]
     
-    df_out = pd.DataFrame(out_list, columns = ['Concepto', 'Euros'])
-    return df_out
+    df_out = pd.DataFrame(out_list, columns = ['Concepto', 'Euros']).groupby('Concepto').sum()
+    df_out = df_out.reset_index()
+    df_out['Porcent'] = df_out['Euros']/df_out['Euros'].sum()
+
+    str_otros = [ subt_fijo, subt_variable, subt_impElec, subt_contador, subt_iva, total]
+    
+    return df_out, str_otros 
 
 
-def temporal_df( inputs, generation, prices, profiles, taxes):
+def temporal_df( inputs, generation, prices, profiles, taxes, gas):
     """
-    This is the function
+    This function builds a dataframe with all the data availble in the time range that is selected for the user.
+    It also consider REE Periods
     """
     inicio = datetime.fromisoformat(inputs['start_date'] )
     fin = datetime.fromisoformat(inputs['end_date'] ) + timedelta(hours=23)
@@ -422,24 +478,25 @@ def temporal_df( inputs, generation, prices, profiles, taxes):
         inputs['potencias']
     )
     
+    profiles = profiles[ inputs['start_date'] : inputs['end_date']]
     generation = generation[ inputs['start_date'] : inputs['end_date']]
     prices = prices[ inputs['start_date'] : inputs['end_date']]
-    profiles = profiles[ inputs['start_date'] : inputs['end_date']]
     taxes = taxes[ inputs['start_date'] : inputs['end_date']]
+    gas = gas[ inputs['start_date'] : inputs['end_date']]
 
 
     # curva_consumo = salida.iloc[:,0:4]
-    # prices = salida.iloc[:,4:20]
-    # generation = salida.iloc[:, 20:43]
-    # taxes = salida.iloc[:, 43,44]
+    # prices = salida.iloc[:,4:12]
+    # generation = salida.iloc[:, 12:35]
+    # taxes = salida.iloc[:, 35:36]
+    # gas = salida.iloc[:, 36:37]
     
-    return pd.concat( [curva_consumo,prices,generation,taxes], axis = 1)
+    return pd.concat( [curva_consumo,prices,generation,taxes,gas], axis = 1)
 
 
 def total_df( inputs, curva_consumo, prices):
     """
-     This function calculate the final prices
-    
+     This function takes each of the components of the prices and calculate the final prices that is going to appear in the bill 
     """
     inicio = datetime.fromisoformat(inputs['start_date'] )
     fin = datetime.fromisoformat(inputs['end_date'] ) + timedelta(hours=23)
@@ -454,25 +511,47 @@ def total_df( inputs, curva_consumo, prices):
         inputs['cargos_potencia'],
         inputs['margen_potencia']
     )
+
+    fijo = []
+    for index, row in comp_fija.iterrows():
+        base_list = [ row['Periodos'], row['PC'], row['peajes_Potencia'], row['cargos_Potencia'], row['Margen'], row['K.dias'], row['T_Fijo'] ]
+        fijo.append(base_list)
     
     comp_variable = termino_energia(
-        fechas_ree,
-        inputs['tarifa'],  
+        fechas_ree,  inputs['tarifa'],  
         inputs['peajes_energia'], 
         inputs['cargos_energia'],
         curva_consumo,
         prices
     )
-
-    df_final = precio_final(
+    
+    variable = []
+    for index, row in comp_variable.iterrows():
+        base_list = [ f"P{index}", row['Consumo'], row['peajes_Energia'], row['cargos_Energia'],row['PrecioEnergia'], row['T_Variable'] ]
+        variable.append(base_list)
+    
+    df_final, componentes = precio_final(
         comp_fija,
         comp_variable,
         inputs['imp_electrico'],
         inputs['alquiler_contador'],
         inputs['iva'],
     )
+    
+    subt_fijo, subt_variable, subt_impElec, subt_contador, subt_iva, total = componentes
+    
+    dict_final = {
+        'Termino_Fijo': fijo,
+        'Subt_Fijo': subt_fijo,
+        'Termino_Variable': variable,
+        'Subt_Variable': subt_variable,
+        'IEE': subt_impElec,
+        'Contador': subt_contador,
+        'IVA': subt_iva,
+        'Total': total
+    }
 
-    return df_final
+    return df_final, dict_final
 
  
 if __name__ == "__main__":

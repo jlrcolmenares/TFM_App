@@ -3,6 +3,9 @@
 .vscode/
 .ipynb/
 
+*.csv
+*.json
+
 venv/
 *.pyc
 .env
