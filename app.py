@@ -28,7 +28,8 @@ app = dash.Dash(
     __name__,
     external_stylesheets=[dbc.themes.COSMO],
     prevent_initial_callbacks= True,
-) 
+)
+app.title = 'MSIET Colmenares'
 server = app.server
 
 body = html.Div(
@@ -60,7 +61,7 @@ body = html.Div(
                         botonCalcular,
                     ]
                 )
-                ], xs=10, sm=10, md=4, lg=4, xl=4
+                ], xs=10, sm=10, md=10, lg=4, xl=4
             ),
             dbc.Col( # Right-layout
                 [
@@ -72,7 +73,7 @@ body = html.Div(
                             graph_tabs,
                         ]  
                     )
-                ], xs=10, sm=10, md=6, lg=6, xl=6
+                ], xs=10, sm=10, md=10, lg=6, xl=6
             )
         ], justify="center"),
     ]
@@ -81,7 +82,7 @@ body = html.Div(
    
 ############################# CALL THE APP ####################################
 
-# Main Call for
+# Main Call for App
 app.layout = html.Div(children=[body])
 
 
@@ -218,13 +219,11 @@ def alertas_y_calculos( clicks, data ):
     alerts, flag_continue = validation(inputs)
    
     if flag_continue: # Si todo está bien 
-        #print("Funcion backend")
         # se cargan los datos disponibles en base de datos ()
         gen, prices, profiles, co2_taxes, gas_index = load_local_data( joined = False)
         # se calcular las componentes finales y se regresa un único dataframe
         dia_dia = temporal_df( inputs, gen, prices, profiles, co2_taxes, gas_index)
         
-    
         data_temporal = dia_dia.to_json( orient= 'split')
         
         card_output = [ # Alerts que no me dajan seguir
@@ -561,6 +560,5 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
 ##########################################
 if __name__ == "__main__":
     app.run_server(debug=True)
-    #server = app.server
     
 

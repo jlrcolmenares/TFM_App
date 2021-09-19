@@ -50,8 +50,14 @@ class reeHolidays(holidays.Spain):
 
 
 def ree_periods( startdate, enddate ):
-    """ 
-    This function take two date and assign the period depending of what de legislation says
+    """This function takes start and end date and assign the corresponding electrical period, depending for all the tariff
+
+    Args:
+        startdate ([datetime]): range start date
+        enddate ([datetime]): range end date
+
+    Returns:
+        [dataframe]: with date, hour and period for the corresponding tariff
     """
     # Initial Assertions
     assert type(startdate) == datetime, 'Must be datetime'
@@ -141,9 +147,16 @@ def ree_periods( startdate, enddate ):
 
 
 def ree_dates( startdate, enddate):
-    """
-    Take two dates and return a dataframe with the date that are according to REE
-    """
+    """This function takes two dates all the hours between two assingned dates. 
+
+    Args:
+        startdate ([datetime]): start date of range
+        enddate ([datetime]): end date of range
+
+    Returns:
+        [dataframe]: A table with all the hour between the dates and the following columns: year, month, day, hour, weekday, feriado, verano(1)/invierno(0)
+    """    
+
     # Initial Assertions
     assert type(startdate) == datetime, 'Must be datetime'
     assert type(enddate) == datetime, 'Must be datetime'
@@ -214,7 +227,7 @@ def ree_dates( startdate, enddate):
                     for hour in range(0,24): # normal days with 24 hours
                         hours.append( datetime(year, month, day, hour))
 
-            #daylight_saving.append([day_short, day_long])
+        daylight_saving.append([ datetime( year,3,day_short) , datetime(year,10,day_long) ])
 
     output = []
     for item in hours:
@@ -236,11 +249,11 @@ def ree_dates( startdate, enddate):
     df.loc[ ( df.index.weekday.isin([5,6]) | df.index.isin(festivos) ) , 'feriado_finde' ] = 1
 
     # invierno_verano
-    # df['verano(1)/invierno(0)']
-    # for pair in daylight_saving:
-    #     summer_start = pair[0].strftime('%Y-%m-%d')
-    #     summer_ends = pair[1].strftime('%Y-%m-%d')
-    #     df.between_time( summer_start, summer_ends )
+    df['verano(1)/invierno(0)'] =  0
+    for summer_range in daylight_saving:
+        summer_start = summer_range[0].strftime('%Y-%m-%d')
+        summer_ends = summer_range[1].strftime('%Y-%m-%d')
+        df.loc[ summer_start: summer_ends, 'verano(1)/invierno(0)' ] = 1
 
     # Before returning the output. Filter between the date: 
     df = df.loc[ startdate : enddate ]

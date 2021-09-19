@@ -10,9 +10,9 @@ import timeit
 # Function Utils
 from ree_dates import ree_periods
 
-def build_data_sources( ):
+def build_data_sources():
     """
-    This functions takes json files from scraping stage and transforme then in pickle files that are more actionable and usable inside the main app
+    This function takes json and csv files from scraping stage and transforme then into pickle files that are more actionable and usable inside the main app
     """
     # 1) Process "Power Generation" Data
     generation = pd.read_json(
@@ -218,11 +218,11 @@ def validation(inputs):
 ############ CALLBACKS PARA TRATAMIENTO DE DATOS DISPONIBLES ##################
 
 def load_local_data( joined = True ):
-    """
-    The function load data from the given source. At the start, we
-    are going to work with json files. In the following version I want to
-    return the data from ESIOS api (or personal API):
-    """
+    """This funcion consolidated data from the scraping phase and put it in disposition to the app.
+
+    Returns:
+        [dataframe]: dataframe with each one of the sources available
+    """    
     generation = pd.read_pickle("./data/power_generation/generation.pkl")
     prices = pd.read_pickle("./data/energy_prices/prices.pkl")
     consumption_profiles = pd.read_pickle("./data/consumption/consump_profiles.pkl")
@@ -462,10 +462,19 @@ def precio_final( termino_potencia, termino_energia, imp_electrico, contador, iv
 
 
 def temporal_df( inputs, generation, prices, profiles, taxes, gas):
-    """
-    This function builds a dataframe with all the data availble in the time range that is selected for the user.
-    It also consider REE Periods
-    """
+    """This function builds a dataframe with all the data availble in the time range that is selected for the user. It also consider REE Periods
+
+    Args:
+        inputs ([dict]): Python dict with the options selected in the input form
+        generation ([dataframe]): dataframe built with historical scraped data
+        prices ([dataframe]): dataframe built with historical scraped data
+        profiles ([dataframe]): dataframe built with historical scraped data
+        taxes ([dataframe]): dataframe built with historical scraped data
+        gas ([dataframe]): dataframe built with historical scraped data
+
+    Returns:
+        temporal_data [dataframe]: dataframe of concatenated data by column
+    """        
     inicio = datetime.fromisoformat(inputs['start_date'] )
     fin = datetime.fromisoformat(inputs['end_date'] ) + timedelta(hours=23)
     fechas_ree = ree_periods( inicio , fin )
@@ -495,8 +504,16 @@ def temporal_df( inputs, generation, prices, profiles, taxes, gas):
 
 
 def total_df( inputs, curva_consumo, prices):
-    """
-     This function takes each of the components of the prices and calculate the final prices that is going to appear in the bill 
+    """This function takes the inputs of the form, the prices and the curva de consumo indicated for the user and calculate de total price in euros of the electrical bill for the daterange selected in the form 
+
+    Args:
+        inputs ([dict]): The input form throws a build a json dict with all the input data
+        curva_consumo ([dataframe]): this dataframe is build from the curva_consumo data indicated by the user
+        prices ([dataframe]): this dataframe is build from the historical prices or the 
+
+    Returns:
+        df_final ([dataframe]): contains each one of the values divided by components
+        dict_final ([dict]): contains the values to build the "desglose" of bill
     """
     inicio = datetime.fromisoformat(inputs['start_date'] )
     fin = datetime.fromisoformat(inputs['end_date'] ) + timedelta(hours=23)
@@ -518,7 +535,8 @@ def total_df( inputs, curva_consumo, prices):
         fijo.append(base_list)
     
     comp_variable = termino_energia(
-        fechas_ree,  inputs['tarifa'],  
+        fechas_ree,
+        inputs['tarifa'],  
         inputs['peajes_energia'], 
         inputs['cargos_energia'],
         curva_consumo,
