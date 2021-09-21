@@ -310,9 +310,21 @@ def build_consumptions_df(
 
 
 def termino_potencia(df_ree, tarifa, potences, peajes_potencia, cargos_potencia, margen):
-    
+    """This functions calculates the termino de potencia
+
+    Args:
+        df_ree ([datafram]): 
+        tarifa ([string]): 
+        potences ([list]): 
+        peajes_potencia ([list]): 
+        cargos_potencia ([list]): 
+        margen ([float]): 
+
+    Returns:
+        comp_fija [dataframe]: 
+    """    
     dias = len(df_ree.resample('1D').count())
-    K = dias/356 # constante para adaptar el 
+    K = dias/356 # constante que contiene dias/año
     
     if tarifa == '2.0TD':
         out_list = []
@@ -330,8 +342,8 @@ def termino_potencia(df_ree, tarifa, potences, peajes_potencia, cargos_potencia,
         out_list.append([
             'Ppunta',
             potences['P1'],
-            peajes_potencia[p],
-            cargos_potencia[p],
+            0,
+            0,
             margen,
             (dias/365),
             (potences['P1'] * (margen) * (K))      
@@ -368,12 +380,19 @@ def termino_potencia(df_ree, tarifa, potences, peajes_potencia, cargos_potencia,
 
 
 def termino_energia(df_ree, tarifa, peajes_energia, cargos_energia, curva_consumo, prices):
-    """
-    This funcion take the regulatory payments indicated by State and Goverment agencies and build a dataframe that have the hourly regulatory payments.
+    """Calculates el termino de energia considering inputs
 
-    [Disclaimer]: Each  hour of the day have different payments. The results of this fact is that depending on the hour the electricity consumptions in going to be more or less expensive.
-    """
- 
+    Args:
+        df_ree ([dataframe]):
+        tarifa ([string]):
+        peajes_energia ([list]):
+        cargos_energia ([list]):
+        curva_consumo ([dataframe]):
+        prices ([dataframe]):
+
+    Returns:
+        comp_variable [dataframe]:
+    """    
     if tarifa == "2.0TD":
         # For 2.0TD
         df_aux = df_ree.loc[:, ["feriado_finde", "20TD_periods"]]
@@ -420,10 +439,19 @@ def termino_energia(df_ree, tarifa, peajes_energia, cargos_energia, curva_consum
 
 
 def precio_final( termino_potencia, termino_energia, imp_electrico, contador, iva):
-    """
-    The functions add the rest of the valuus of the selectors to calculate the final price
-    """
-    
+    """This function take the rest of input and calculate the final price in the bILL
+
+    Args:
+        termino_potencia ([dataframe]):
+        termino_energia ([dataframe]):
+        imp_electrico ([float]):
+        contador ([float]):
+        iva ([float]):
+
+    Returns:
+        [dataframe]: to build the graph
+        [dict]: to build the desglose
+    """    
     subt_fijo = termino_potencia['T_Fijo'].sum()
     subt_variable = termino_energia['T_Variable'].sum()
     subt_impElec = ( subt_fijo + subt_variable )*( imp_electrico / 100)
@@ -431,11 +459,16 @@ def precio_final( termino_potencia, termino_energia, imp_electrico, contador, iv
     subt_iva = (subt_fijo+subt_variable+subt_impElec+subt_contador)*( iva /100)
     total = subt_fijo+subt_variable+subt_impElec+subt_contador+subt_iva
     
-    serie = termino_energia.sum()
-    out1 = ['Peajes', serie['peajes_Energia']]
-    out2 =['Cargos', serie['cargos_Energia']]
-    out3 = ['Consumo', serie['T_Variable'] - serie['peajes_Energia'] - serie['cargos_Energia']]
+    out1, out2, out3 = 0, 0 ,0
+    for index, row in termino_energia.iterrows():
+        out1 = out1 + row['Consumo']*row['peajes_Energia']
+        out2 = out2 + row['Consumo']*row['cargos_Energia']
+        out3 = out3 + row['Consumo']*row['PrecioEnergia']
     
+    out1 = ['Peajes', out1 ]
+    out2 = ['Cargos', out2 ]
+    out3 = ['Energía', out3 ]
+
     out4, out5, out6 = 0, 0 ,0
     for index,row in termino_potencia.iterrows():
         out4 = out4 + row['PC']*row['peajes_Potencia']*row['K.dias']
@@ -448,7 +481,7 @@ def precio_final( termino_potencia, termino_energia, imp_electrico, contador, iv
 
     out7 = ['Contador', subt_contador]
     out8 = ['Impuestos', subt_impElec]
-    out9 = ['Impuestos',subt_iva]
+    out9 = ['Impuestos', subt_iva]
     
     out_list = [out1, out2, out3, out4, out5, out6, out7, out8, out9]
     
@@ -456,6 +489,7 @@ def precio_final( termino_potencia, termino_energia, imp_electrico, contador, iv
     df_out = df_out.reset_index()
     df_out['Porcent'] = df_out['Euros']/df_out['Euros'].sum()
 
+    total = df_out['Euros'].sum() # ATENCIÓN AQUÍ
     str_otros = [ subt_fijo, subt_variable, subt_impElec, subt_contador, subt_iva, total]
     
     return df_out, str_otros 

@@ -68,12 +68,14 @@ body = html.Div(
                     html.Div (#Auxiliary Output
                         children=[aux_output]
                     ),
-                    html.Div( # Output
-                        children=[
-                            graph_tabs,
-                        ]  
-                    )
-                ], xs=10, sm=10, md=10, lg=6, xl=6
+                    dbc.Spinner([
+                        html.Div( # Output
+                            children=[
+                                graph_tabs,
+                            ]  
+                        )
+                    ], fullscreen= True, color = "info", size = 'lg')
+                ], xs=10, sm=10, md=10, lg=6, xl=6 
             )
         ], justify="center"),
     ]
@@ -357,7 +359,7 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
     [Input('validation-status', 'color')],
     State('output-tiempo-graph','data')
 )
-def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20] 
+def graph_market(status, temporal_df): # slice the whole dataframe DF[0:20] 
     if status == 'warning':
         print("No se grafica3")
     elif status == 'success':
@@ -436,7 +438,7 @@ def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20]
     [Input('validation-status', 'color')],
     State('output-tiempo-graph','data')
 )
-def graph_consumo(status, temporal_df): # slice the whole dataframe DF[0:20] 
+def graph_generation(status, temporal_df): # slice the whole dataframe DF[0:20] 
     if status == 'warning':
         print("No se grafica4")
     elif status == 'success':

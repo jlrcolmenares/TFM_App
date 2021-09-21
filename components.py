@@ -455,7 +455,7 @@ aux_output = html.Div(
         
     ]   
 )
-pre
+
 def build_deglose( inputs, dict_out ):
     """
     Construir el desglose es un proceso más o menos fastidioso
