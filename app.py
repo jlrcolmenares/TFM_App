@@ -318,10 +318,15 @@ def graph_components(status, inputs, temporal_df):
             df_out.reset_index(),
             x="Concepto",
             y="Euros",
-            color="Concepto",
+            #color="Concepto",
             text="Porcent",
         )
-        fig.update_traces(textposition="outside", texttemplate="%{text:.2%}")
+        fig.update_traces(
+            textposition="outside", 
+            texttemplate="%{text:.2%}",
+            marker = dict( color = ['#008000', '#C00001', '#FFC001', '#000000', '#D9D9D9', '#305496' ]),
+
+        )
         return desglose, fig
 
 
